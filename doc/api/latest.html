@@ -35,6 +35,7 @@
 window.onload = function() {
 
   var spec = null;
+  var changelinks = true;
 
   // Build a system
   const ui = SwaggerUIBundle({
@@ -53,6 +54,23 @@ window.onload = function() {
   })
 
   window.ui = ui
+
+  function findParent(tagname,el){
+    while (el){
+      if ((el.nodeName || el.tagName).toLowerCase()===tagname.toLowerCase()){
+        return el;
+      }
+      el = el.parentNode;
+    }
+    return null;
+  }
+  document.body.onclick = function(e) {
+    var from = findParent('a', e.target || e.srcElement);
+    if (changelinks && from) {
+      var lnk = from.getAttribute("href");
+      from.setAttribute("href", lnk.replace("api.md", "api"));
+    }
+  };
 }
 </script>
 </body>
