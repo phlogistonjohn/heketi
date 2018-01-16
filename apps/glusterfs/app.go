@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
@@ -88,83 +87,10 @@ func NewApp(configIo io.Reader) *App {
 		dbfilename = app.conf.DBfile
 	}
 
-	// Setup BoltDB database
-	app.db, err = bolt.Open(dbfilename, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	app.db, app.dbReadOnly, err = DbOpen(dbfilename)
 	if err != nil {
-		logger.LogError("Unable to open database: %v. Retrying using read only mode", err)
-
-		// Try opening as read-only
-		app.db, err = bolt.Open(dbfilename, 0666, &bolt.Options{
-			ReadOnly: true,
-		})
-		if err != nil {
-			logger.LogError("Unable to open database: %v", err)
-			return nil
-		}
-		app.dbReadOnly = true
-	} else {
-		err = app.db.Update(func(tx *bolt.Tx) error {
-			// Create Cluster Bucket
-			_, err := tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_CLUSTER))
-			if err != nil {
-				logger.LogError("Unable to create cluster bucket in DB")
-				return err
-			}
-
-			// Create Node Bucket
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_NODE))
-			if err != nil {
-				logger.LogError("Unable to create node bucket in DB")
-				return err
-			}
-
-			// Create Volume Bucket
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_VOLUME))
-			if err != nil {
-				logger.LogError("Unable to create volume bucket in DB")
-				return err
-			}
-
-			// Create Device Bucket
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_DEVICE))
-			if err != nil {
-				logger.LogError("Unable to create device bucket in DB")
-				return err
-			}
-
-			// Create Brick Bucket
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_BRICK))
-			if err != nil {
-				logger.LogError("Unable to create brick bucket in DB")
-				return err
-			}
-
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_BLOCKVOLUME))
-			if err != nil {
-				logger.LogError("Unable to create blockvolume bucket in DB")
-				return err
-			}
-
-			_, err = tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_DBATTRIBUTE))
-			if err != nil {
-				logger.LogError("Unable to create dbattribute bucket in DB")
-				return err
-			}
-
-			// Handle Upgrade Changes
-			err = app.Upgrade(tx)
-			if err != nil {
-				logger.LogError("Unable to Upgrade Changes")
-				return err
-			}
-
-			return nil
-
-		})
-		if err != nil {
-			logger.Err(err)
-			return nil
-		}
+		logger.LogError("Unable to open database: %v", err)
+		return nil
 	}
 
 	// Set values mentioned in environmental variable
@@ -209,42 +135,6 @@ func (a *App) setLogLevel(level string) {
 	case "debug":
 		logger.SetLevel(utils.LEVEL_DEBUG)
 	}
-}
-
-// Upgrade Path to update all the values for new API entries
-func (a *App) Upgrade(tx *bolt.Tx) error {
-
-	err := ClusterEntryUpgrade(tx)
-	if err != nil {
-		logger.LogError("Failed to upgrade db for cluster entries")
-		return err
-	}
-
-	err = NodeEntryUpgrade(tx)
-	if err != nil {
-		logger.LogError("Failed to upgrade db for node entries")
-		return err
-	}
-
-	err = VolumeEntryUpgrade(tx)
-	if err != nil {
-		logger.LogError("Failed to upgrade db for volume entries")
-		return err
-	}
-
-	err = DeviceEntryUpgrade(tx)
-	if err != nil {
-		logger.LogError("Failed to upgrade db for device entries")
-		return err
-	}
-
-	err = BrickEntryUpgrade(tx)
-	if err != nil {
-		logger.LogError("Failed to upgrade db for brick entries: %v", err)
-		return err
-	}
-
-	return nil
 }
 
 func (a *App) setFromEnvironmentalVariable() {
