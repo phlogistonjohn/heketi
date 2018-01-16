@@ -87,7 +87,7 @@ func NewApp(configIo io.Reader) *App {
 		dbfilename = app.conf.DBfile
 	}
 
-	app.db, app.dbReadOnly, err = DbOpen(dbfilename)
+	app.db, app.dbReadOnly, err = DbOpen(dbfilename, true)
 	if err != nil {
 		logger.LogError("Unable to open database: %v", err)
 		return nil

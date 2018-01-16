@@ -30,28 +30,24 @@ const (
 )
 
 
-func DbOpen(filename string) (*bolt.DB, bool, error) {
+func DbOpen(filename string, okReadOnly bool) (*bolt.DB, bool, error) {
 	var db *bolt.DB
 	var err error
 	db, err = bolt.Open(filename, 0600, &bolt.Options{Timeout: 3 * time.Second})
-	if err != nil {
+	switch {
+	case err != nil && okReadOnly:
 		logger.LogError("Unable to open database: %v. Retrying using read only mode", err)
-
 		// Try opening as read-only
 		db, err = bolt.Open(filename, 0666, &bolt.Options{
 			ReadOnly: true,
 		})
-		if err != nil {
-			return db, false, err
-		}
-		return db, true, nil
-	} else {
+		return db, okReadOnly, err
+	case err != nil:
+		return db, false, err
+	default:
 		err = DbInitialize(db)
-		if err != nil {
-			return db, false, err
-		}
+		return db, false, err
 	}
-	return db, false, nil
 }
 
 func DbInitialize(db *bolt.DB) error {
