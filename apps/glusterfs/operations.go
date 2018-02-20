@@ -19,6 +19,15 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+type OperationRetryError struct {
+	OriginalError error
+}
+
+func (ore OperationRetryError) Error() string {
+	return fmt.Sprintf("Operation Should Be Retried; Error: %v",
+		ore.OriginalError.Error())
+}
+
 // The operations.go file is meant to provide a common approach to planning,
 // executing, and completing changes to the storage clusters under heketi
 // management as well as accurately reflecting these changes in the heketi db.
@@ -40,6 +49,13 @@ type Operation interface {
 	Exec(executor executors.Executor) error
 	Rollback(executor executors.Executor) error
 	Finalize() error
+	MaxRetries() int
+}
+
+type noRetriesOperation struct{}
+
+func (n *noRetriesOperation) MaxRetries() int {
+	return 0
 }
 
 // OperationManager is an embeddable struct meant to be used within any
@@ -59,6 +75,7 @@ func (om *OperationManager) Id() string {
 type VolumeCreateOperation struct {
 	OperationManager
 	vol *VolumeEntry
+	noRetriesOperation
 }
 
 // NewVolumeCreateOperation returns a new VolumeCreateOperation populated
@@ -173,6 +190,7 @@ func (vc *VolumeCreateOperation) Rollback(executor executors.Executor) error {
 // expand an existing volume.
 type VolumeExpandOperation struct {
 	OperationManager
+	noRetriesOperation
 	vol *VolumeEntry
 
 	// modification values
@@ -298,6 +316,7 @@ func (ve *VolumeExpandOperation) Finalize() error {
 // delete an existing volume.
 type VolumeDeleteOperation struct {
 	OperationManager
+	noRetriesOperation
 	vol *VolumeEntry
 }
 
@@ -413,6 +432,7 @@ func (vdel *VolumeDeleteOperation) Finalize() error {
 // create a new volume.
 type BlockVolumeCreateOperation struct {
 	OperationManager
+	noRetriesOperation
 	bvol *BlockVolumeEntry
 	//vol *VolumeEntry
 }
@@ -634,6 +654,7 @@ func (bvc *BlockVolumeCreateOperation) Rollback(executor executors.Executor) err
 // delete an existing volume.
 type BlockVolumeDeleteOperation struct {
 	OperationManager
+	noRetriesOperation
 	bvol *BlockVolumeEntry
 }
 
@@ -716,6 +737,7 @@ func (vdel *BlockVolumeDeleteOperation) Finalize() error {
 // operation in the future.
 type DeviceRemoveOperation struct {
 	OperationManager
+	noRetriesOperation
 	DeviceId  string
 	allocator Allocator
 }
@@ -921,6 +943,14 @@ func AsyncHttpOperation(app *App,
 	app.asyncManager.AsyncHttpRedirectFunc(w, r, func() (string, error) {
 		logger.Info("Started async operation: %v", label)
 		if err := op.Exec(app.executor); err != nil {
+			if _, ok := err.(OperationRetryError); ok && op.MaxRetries() > 0 {
+				logger.Warning("%v Exec requested retry", label)
+				err := retryOperation(op, app.Allocator(), app.executor)
+				if err != nil {
+					return "", err
+				}
+				return op.ResourceUrl(), nil
+			}
 			if rerr := op.Rollback(app.executor); rerr != nil {
 				logger.LogError("%v Rollback error: %v", label, rerr)
 			}
@@ -958,6 +988,10 @@ func RunOperation(o Operation,
 		return err
 	}
 	if err := o.Exec(executor); err != nil {
+		if _, ok := err.(OperationRetryError); ok && o.MaxRetries() > 0 {
+			logger.Warning("%v Exec requested retry", label)
+			return retryOperation(o, allocator, executor)
+		}
 		if rerr := o.Rollback(executor); rerr != nil {
 			logger.LogError("%v Rollback error: %v", label, rerr)
 		}
@@ -968,4 +1002,43 @@ func RunOperation(o Operation,
 		return err
 	}
 	return nil
+}
+
+func retryOperation(o Operation,
+	allocator Allocator,
+	executor executors.Executor) (err error) {
+
+	label := o.Label()
+	max := o.MaxRetries()
+	for i := 0; i < max; i++ {
+		logger.Info("Retry %v (%v)", label, i+1)
+		if e := o.Rollback(executor); e != nil {
+			// when retrying rollback must succeed cleanly or it
+			// is not safe to retry
+			logger.LogError("%v Rollback error: %v", label, e)
+			return e
+		}
+		if e := o.Build(allocator); e != nil {
+			logger.LogError("%v Build Failed: %v", label, e)
+			return e
+		}
+		err = o.Exec(executor)
+		if err == nil {
+			// exec succeeded. Finalize it and we're outta here.
+			return o.Finalize()
+		}
+		logger.LogError("%v Failed: %v", label, err)
+		if _, ok := err.(OperationRetryError); !ok {
+			break
+		}
+	}
+	if e := o.Rollback(executor); e != nil {
+		logger.LogError("%v Rollback error: %v", label, e)
+	}
+	// if we exceeded our retries, pull the "real" error out
+	// of the retry error so we return that
+	if ore, ok := err.(OperationRetryError); ok {
+		err = ore.OriginalError
+	}
+	return
 }
