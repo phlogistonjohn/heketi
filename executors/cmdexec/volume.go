@@ -286,6 +286,66 @@ func (s *CmdExecutor) VolumeReplaceBrick(host string, volume string, oldBrick *e
 
 }
 
+func (s *CmdExecutor) VolumeClone(host string, vcr *executors.VolumeCloneRequest) (*executors.Volume, error) {
+	godbc.Require(host != "")
+	godbc.Require(vcr != nil)
+
+	vsr := executors.VolumeSnapshotRequest{
+		Volume: vcr.Volume,
+	}
+
+	snap, err := s.VolumeSnapshot(host, &vsr)
+	if err != nil {
+		return nil, err
+	}
+
+	// we do not want activated snapshots sticking around
+	defer s.SnapshotDestroy(host, snap.Name)
+
+	scr := executors.SnapshotCloneRequest{
+		Snapshot: snap.Name,
+		Volume:   vcr.Clone,
+	}
+
+	vol, err := s.SnapshotCloneVolume(host, &scr)
+	if err != nil {
+		return nil, err
+	}
+
+	return vol, nil
+}
+
+func (s *CmdExecutor) VolumeSnapshot(host string, vsr *executors.VolumeSnapshotRequest) (*executors.Snapshot, error) {
+	godbc.Require(host != "")
+	godbc.Require(vsr != nil)
+
+	type CliOutput struct {
+		OpRet    int                `xml:"opRet"`
+		OpErrno  int                `xml:"opErrno"`
+		OpErrStr string             `xml:"opErrstr"`
+		Snapshot executors.Snapshot `xml:"snapCreate"`
+	}
+
+	command := []string{
+		fmt.Sprintf("gluster --mode=script --xml snapshot create %v %v no-timestamp", vsr.Snapshot, vsr.Volume),
+		// TODO: set the snapshot description if vsr.Description is non-empty
+	}
+
+	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create snapshot of volume: %v", vsr.Volume)
+	}
+
+	var snapCreate CliOutput
+	err = xml.Unmarshal([]byte(output[0]), &snapCreate)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create snapshot of volume: %v", vsr.Volume)
+	}
+	logger.Debug("%+v\n", snapCreate)
+
+	return &snapCreate.Snapshot, nil
+}
+
 func (s *CmdExecutor) HealInfo(host string, volume string) (*executors.HealInfo, error) {
 
 	godbc.Require(volume != "")
