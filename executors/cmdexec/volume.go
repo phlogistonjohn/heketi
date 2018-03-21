@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/heketi/heketi/executors"
+	"github.com/heketi/heketi/pkg/utils"
 	"github.com/lpabon/godbc"
 )
 
@@ -291,7 +292,8 @@ func (s *CmdExecutor) VolumeClone(host string, vcr *executors.VolumeCloneRequest
 	godbc.Require(vcr != nil)
 
 	vsr := executors.VolumeSnapshotRequest{
-		Volume: vcr.Volume,
+		Volume:   vcr.Volume,
+		Snapshot: "tmpsnap_" + utils.GenUUID(),
 	}
 
 	snap, err := s.VolumeSnapshot(host, &vsr)
@@ -320,10 +322,10 @@ func (s *CmdExecutor) VolumeSnapshot(host string, vsr *executors.VolumeSnapshotR
 	godbc.Require(vsr != nil)
 
 	type CliOutput struct {
-		OpRet    int                `xml:"opRet"`
-		OpErrno  int                `xml:"opErrno"`
-		OpErrStr string             `xml:"opErrstr"`
-		Snapshot executors.Snapshot `xml:"snapCreate"`
+		OpRet      int                  `xml:"opRet"`
+		OpErrno    int                  `xml:"opErrno"`
+		OpErrStr   string               `xml:"opErrstr"`
+		SnapCreate executors.SnapCreate `xml:"snapCreate"`
 	}
 
 	command := []string{
@@ -333,17 +335,24 @@ func (s *CmdExecutor) VolumeSnapshot(host string, vsr *executors.VolumeSnapshotR
 
 	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create snapshot of volume: %v", vsr.Volume)
+		return nil, fmt.Errorf("Unable to create snapshot of volume %v: %v", vsr.Volume, err)
 	}
 
 	var snapCreate CliOutput
 	err = xml.Unmarshal([]byte(output[0]), &snapCreate)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create snapshot of volume: %v", vsr.Volume)
+		return nil, fmt.Errorf("Unable to parse output of creating snapshot of volume %v: %v", vsr.Volume, err)
 	}
-	logger.Debug("%+v\n", snapCreate)
+	logger.Debug("snapCreate: %+v\n", snapCreate)
 
-	return &snapCreate.Snapshot, nil
+	if snapCreate.OpRet != 0 {
+		return nil, fmt.Errorf("Failed to create snapshot of volume %v: %v", vsr.Volume, snapCreate.OpErrStr)
+	}
+
+	snap := &snapCreate.SnapCreate.Snapshot
+	logger.Debug("snapshot: %+v\n", snap)
+
+	return snap, nil
 }
 
 func (s *CmdExecutor) HealInfo(host string, volume string) (*executors.HealInfo, error) {

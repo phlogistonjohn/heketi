@@ -22,10 +22,10 @@ func (s *CmdExecutor) snapshotActivate(host string, snapshot string) error {
 	godbc.Require(snapshot != "")
 
 	type CliOutput struct {
-		OpRet    int                `xml:"opRet"`
-		OpErrno  int                `xml:"opErrno"`
-		OpErrStr string             `xml:"opErrstr"`
-		Snapshot executors.Snapshot `xml:"snapActivate"`
+		OpRet        int                    `xml:"opRet"`
+		OpErrno      int                    `xml:"opErrno"`
+		OpErrStr     string                 `xml:"opErrstr"`
+		SnapActivate executors.SnapActivate `xml:"snapActivate"`
 	}
 
 	command := []string{
@@ -34,13 +34,13 @@ func (s *CmdExecutor) snapshotActivate(host string, snapshot string) error {
 
 	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
 	if err != nil {
-		return fmt.Errorf("Unable to activate snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to activate snapshot %v: %v", snapshot, err)
 	}
 
 	var snapActivate CliOutput
 	err = xml.Unmarshal([]byte(output[0]), &snapActivate)
 	if err != nil {
-		return fmt.Errorf("Unable to activate snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to parse output from activate snapshot %v: %v", snapshot, err)
 	}
 	logger.Debug("%+v\n", snapActivate)
 
@@ -52,10 +52,10 @@ func (s *CmdExecutor) snapshotDeactivate(host string, snapshot string) error {
 	godbc.Require(snapshot != "")
 
 	type CliOutput struct {
-		OpRet    int                `xml:"opRet"`
-		OpErrno  int                `xml:"opErrno"`
-		OpErrStr string             `xml:"opErrstr"`
-		Snapshot executors.Snapshot `xml:"snapDeactivate"`
+		OpRet          int                      `xml:"opRet"`
+		OpErrno        int                      `xml:"opErrno"`
+		OpErrStr       string                   `xml:"opErrstr"`
+		SnapDeactivate executors.SnapDeactivate `xml:"snapDeactivate"`
 	}
 
 	command := []string{
@@ -64,13 +64,13 @@ func (s *CmdExecutor) snapshotDeactivate(host string, snapshot string) error {
 
 	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
 	if err != nil {
-		return fmt.Errorf("Unable to deactivate snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to deactivate snapshot %v: %v", snapshot, err)
 	}
 
 	var snapDeactivate CliOutput
 	err = xml.Unmarshal([]byte(output[0]), &snapDeactivate)
 	if err != nil {
-		return fmt.Errorf("Unable to deactivate snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to parse output from deactivate snapshot %v: %v", snapshot, err)
 	}
 	logger.Debug("%+v\n", snapDeactivate)
 
@@ -91,10 +91,10 @@ func (s *CmdExecutor) SnapshotCloneVolume(host string, vcr *executors.SnapshotCl
 	defer s.snapshotDeactivate(host, vcr.Snapshot)
 
 	type CliOutput struct {
-		OpRet    int              `xml:"opRet"`
-		OpErrno  int              `xml:"opErrno"`
-		OpErrStr string           `xml:"opErrstr"`
-		Volume   executors.Volume `xml:"CloneCreate"`
+		OpRet     int                 `xml:"opRet"`
+		OpErrno   int                 `xml:"opErrno"`
+		OpErrStr  string              `xml:"opErrstr"`
+		SnapClone executors.SnapClone `xml:"CloneCreate"`
 	}
 
 	command := []string{
@@ -103,17 +103,31 @@ func (s *CmdExecutor) SnapshotCloneVolume(host string, vcr *executors.SnapshotCl
 
 	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to clone snapshot: %v", vcr.Snapshot)
+		return nil, fmt.Errorf("Unable to clone snapshot %v: %v", vcr.Snapshot, err)
 	}
 
-	var snapCreate CliOutput
-	err = xml.Unmarshal([]byte(output[0]), &snapCreate)
+	var cliOutput CliOutput
+	err = xml.Unmarshal([]byte(output[0]), &cliOutput)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to clone snapshot: %v", vcr.Snapshot)
+		return nil, fmt.Errorf("Unable to parse output from clone snapshot %v: %v", vcr.Snapshot, err)
 	}
-	logger.Debug("%+v\n", snapCreate)
+	logger.Debug("%+v\n", cliOutput)
+	if cliOutput.OpRet != 0 {
+		return nil, fmt.Errorf("Failed to clone snapshot %v to volume %v: %v", vcr.Snapshot, vcr.Volume, cliOutput.OpErrStr)
+	}
 
-	return &snapCreate.Volume, nil
+	// start the newly cloned volume
+	command = []string{
+		fmt.Sprintf("gluster --mode=script --xml volume start %v", vcr.Volume),
+	}
+
+	_, err = s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
+	if err != nil {
+		s.VolumeDestroy(host, vcr.Volume)
+		return nil, fmt.Errorf("Unable to start volume %v, clone of snapshot %v: %v", vcr.Volume, vcr.Snapshot, err)
+	}
+
+	return s.VolumeInfo(host, vcr.Volume)
 }
 
 func (s *CmdExecutor) SnapshotCloneBlockVolume(host string, vcr *executors.SnapshotCloneRequest) (*executors.BlockVolumeInfo, error) {
@@ -126,10 +140,10 @@ func (s *CmdExecutor) SnapshotDestroy(host string, snapshot string) error {
 	godbc.Require(snapshot != "")
 
 	type CliOutput struct {
-		OpRet    int                `xml:"opRet"`
-		OpErrno  int                `xml:"opErrno"`
-		OpErrStr string             `xml:"opErrstr"`
-		Snapshot executors.Snapshot `xml:"snapDelete"`
+		OpRet      int                  `xml:"opRet"`
+		OpErrno    int                  `xml:"opErrno"`
+		OpErrStr   string               `xml:"opErrstr"`
+		SnapDelete executors.SnapDelete `xml:"snapDelete"`
 	}
 
 	command := []string{
@@ -138,13 +152,13 @@ func (s *CmdExecutor) SnapshotDestroy(host string, snapshot string) error {
 
 	output, err := s.RemoteExecutor.RemoteCommandExecute(host, command, 10)
 	if err != nil {
-		return fmt.Errorf("Unable to delete snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to delete snapshot %v: %v", snapshot, err)
 	}
 
 	var snapDelete CliOutput
 	err = xml.Unmarshal([]byte(output[0]), &snapDelete)
 	if err != nil {
-		return fmt.Errorf("Unable to delete snapshot: %v", snapshot)
+		return fmt.Errorf("Unable to parse output from delete snapshot %v: %v", snapshot, err)
 	}
 	logger.Debug("%+v\n", snapDelete)
 

@@ -442,20 +442,22 @@ func (vdel *VolumeDeleteOperation) Finalize() error {
 // clone an existing volume.
 type VolumeCloneOperation struct {
 	OperationManager
-	vol   *VolumeEntry
-	clone *VolumeEntry
+	vol       *VolumeEntry
+	clonename string
+	clone     *VolumeEntry
 }
 
 func NewVolumeCloneOperation(
-	vol *VolumeEntry, db wdb.DB) *VolumeCloneOperation {
+	vol *VolumeEntry, db wdb.DB, clonename string) *VolumeCloneOperation {
 
 	return &VolumeCloneOperation{
 		OperationManager: OperationManager{
 			db: db,
 			op: NewPendingOperationEntry(NEW_ID),
 		},
-		vol:   vol,
-		clone: nil,
+		vol:       vol,
+		clonename: clonename,
+		clone:     nil,
 	}
 }
 
@@ -464,21 +466,16 @@ func (vc *VolumeCloneOperation) Label() string {
 }
 
 func (vc *VolumeCloneOperation) ResourceUrl() string {
-	return fmt.Sprintf("/volumes/%v/clone", vc.vol.Info.Id)
+	return fmt.Sprintf("/volumes/%v", vc.clone.Info.Id)
 }
 
 func (vc *VolumeCloneOperation) Build() error {
 	// TODO: finish the implementation...
 	return vc.db.Update(func(tx *bolt.Tx) error {
-		vc.clone = NewVolumeEntry()
 		vc.op.RecordCloneVolume(vc.vol)
 		if e := vc.vol.Save(tx); e != nil {
 			return e
 		}
-		// TODO: clone is the to-be-created volume
-		//if e := vc.clone.Save(tx); e != nil {
-		//	return e
-		//}
 		if e := vc.op.Save(tx); e != nil {
 			return e
 		}
@@ -488,21 +485,22 @@ func (vc *VolumeCloneOperation) Build() error {
 
 func (vc *VolumeCloneOperation) Exec(executor executors.Executor) error {
 	// TODO: finish the implementation...
-	err := vc.vol.cloneVolumeExec(vc.db, executor)
+	clone, err := vc.vol.cloneVolumeExec(vc.db, executor, vc.clonename)
 	if err != nil {
 		logger.LogError("Error executing clone volume: %v", err)
+		return err
 	}
-	return err
+
+	// Store the newly cloned volume in the VolumeCloneOperation
+	vc.clone = clone
+	return nil
 }
 
 func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
 	// TODO: finish the implementation...
 	return vc.db.Update(func(tx *bolt.Tx) error {
-		vc.op.FinalizeVolumeClone(vc.clone)
+		vc.op.FinalizeVolumeClone(vc.vol)
 		if e := vc.vol.Save(tx); e != nil {
-			return e
-		}
-		if e := vc.clone.Save(tx); e != nil {
 			return e
 		}
 
@@ -514,7 +512,7 @@ func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
 func (vc *VolumeCloneOperation) Finalize() error {
 	// TODO: finalize the implementation ...
 	return vc.db.Update(func(tx *bolt.Tx) error {
-		vc.op.FinalizeVolumeClone(vc.clone)
+		vc.op.FinalizeVolumeClone(vc.vol)
 		if err := vc.vol.Save(tx); err != nil {
 			return err
 		}

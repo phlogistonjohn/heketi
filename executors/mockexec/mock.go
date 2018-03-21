@@ -126,9 +126,9 @@ func NewMockExecutor() (*MockExecutor, error) {
 		return snapshot, nil
 	}
 
-	m.MockVolumeClone = func(host string, vsr *executors.VolumeCloneRequest) (*executors.Volume, error) {
+	m.MockVolumeClone = func(host string, vcr *executors.VolumeCloneRequest) (*executors.Volume, error) {
 		vinfo := &executors.Volume{
-			VolumeName: vsr.Volume,
+			VolumeName: "clone_of_" + vcr.Volume,
 			// TODO: fill more properties
 		}
 

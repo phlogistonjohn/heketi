@@ -365,8 +365,7 @@ func (a *App) VolumeClone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: pass the optional name of the clone (msg.Name)
-	op := NewVolumeCloneOperation(volume, a.db)
+	op := NewVolumeCloneOperation(volume, a.db, msg.Name)
 	if err := AsyncHttpOperation(a, w, r, op); err != nil {
 		http.Error(w,
 			fmt.Sprintf("Failed clone volume "+
