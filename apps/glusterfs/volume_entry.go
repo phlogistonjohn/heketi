@@ -12,6 +12,7 @@ package glusterfs
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -725,4 +726,60 @@ func eligibleClusters(db wdb.RODB, req ClusterReq,
 	})
 
 	return candidateClusters, err
+}
+
+func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor) (e error) {
+	vcr, host, err := v.cloneVolumeRequest(db, v.Info.Name)
+	if err != nil {
+		return err
+	}
+
+	_, err = executor.VolumeClone(host, vcr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *VolumeEntry) cloneVolumeRequest(db wdb.RODB, volume string) (*executors.VolumeCloneRequest, string, error) {
+	godbc.Require(db != nil)
+	godbc.Require(volume != "")
+
+	// Setup list of bricks
+	vcr := &executors.VolumeCloneRequest{}
+	vcr.Volume = volume
+	//vcr.Clone = clone  // TODO: pass the name of the cloned volume
+
+	var sshhost string
+	err := db.View(func(tx *bolt.Tx) error {
+		vol, err := NewVolumeEntryFromId(tx, volume)
+		if err != nil {
+			return err
+		}
+
+		cluster, err := NewClusterEntryFromId(tx, vol.Info.Cluster)
+		if err != nil {
+			return err
+		}
+
+		// TODO: verify if the node is available/online?
+		// picking the 1st node for now...
+		node, err := NewNodeEntryFromId(tx, cluster.Info.Nodes[0])
+		if err != nil {
+			return err
+		}
+		sshhost = node.ManageHostName()
+
+		return nil
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	if sshhost == "" {
+		return nil, "", errors.New("failed to find host for cloning volume " + volume)
+	}
+
+	return vcr, sshhost, nil
 }

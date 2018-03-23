@@ -438,6 +438,95 @@ func (vdel *VolumeDeleteOperation) Finalize() error {
 	})
 }
 
+// VolumeCloneOperation implements the operation functions used to
+// clone an existing volume.
+type VolumeCloneOperation struct {
+	OperationManager
+	vol   *VolumeEntry
+	clone *VolumeEntry
+}
+
+func NewVolumeCloneOperation(
+	vol *VolumeEntry, db wdb.DB) *VolumeCloneOperation {
+
+	return &VolumeCloneOperation{
+		OperationManager: OperationManager{
+			db: db,
+			op: NewPendingOperationEntry(NEW_ID),
+		},
+		vol:   vol,
+		clone: nil,
+	}
+}
+
+func (vc *VolumeCloneOperation) Label() string {
+	return "Create Clone of a Volume"
+}
+
+func (vc *VolumeCloneOperation) ResourceUrl() string {
+	return fmt.Sprintf("/volumes/%v/clone", vc.vol.Info.Id)
+}
+
+func (vc *VolumeCloneOperation) Build() error {
+	// TODO: finish the implementation...
+	return vc.db.Update(func(tx *bolt.Tx) error {
+		vc.clone = NewVolumeEntry()
+		vc.op.RecordCloneVolume(vc.vol)
+		if e := vc.vol.Save(tx); e != nil {
+			return e
+		}
+		// TODO: clone is the to-be-created volume
+		//if e := vc.clone.Save(tx); e != nil {
+		//	return e
+		//}
+		if e := vc.op.Save(tx); e != nil {
+			return e
+		}
+		return nil
+	})
+}
+
+func (vc *VolumeCloneOperation) Exec(executor executors.Executor) error {
+	// TODO: finish the implementation...
+	err := vc.vol.cloneVolumeExec(vc.db, executor)
+	if err != nil {
+		logger.LogError("Error executing clone volume: %v", err)
+	}
+	return err
+}
+
+func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
+	// TODO: finish the implementation...
+	return vc.db.Update(func(tx *bolt.Tx) error {
+		vc.op.FinalizeVolumeClone(vc.clone)
+		if e := vc.vol.Save(tx); e != nil {
+			return e
+		}
+		if e := vc.clone.Save(tx); e != nil {
+			return e
+		}
+
+		vc.op.Delete(tx)
+		return nil
+	})
+}
+
+func (vc *VolumeCloneOperation) Finalize() error {
+	// TODO: finalize the implementation ...
+	return vc.db.Update(func(tx *bolt.Tx) error {
+		vc.op.FinalizeVolumeClone(vc.clone)
+		if err := vc.vol.Save(tx); err != nil {
+			return err
+		}
+		if err := vc.clone.Save(tx); err != nil {
+			return err
+		}
+
+		vc.op.Delete(tx)
+		return nil
+	})
+}
+
 // BlockVolumeCreateOperation  implements the operation functions used to
 // create a new volume.
 type BlockVolumeCreateOperation struct {
