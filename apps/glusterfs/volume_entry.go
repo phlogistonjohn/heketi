@@ -178,11 +178,7 @@ func NewVolumeEntryFromClone(v *VolumeEntry, clone *executors.Volume) *VolumeEnt
 	entry.Info.BlockInfo.FreeSize = v.Info.BlockInfo.FreeSize
 	copy(entry.Info.BlockInfo.BlockVolumes, v.Info.BlockInfo.BlockVolumes)
 
-	// TODO: adding bricks like this causes /volume/{clone_uuid} to fail with "Error: Id not found"
-	//for _, b := range clone.Bricks.BrickList {
-	//	entry.Bricks = append(entry.Bricks, b.Name)
-	//}
-
+	// entry.Bricks is still empty, these need to be filler by the caller
 	return entry
 }
 
@@ -759,19 +755,48 @@ func eligibleClusters(db wdb.RODB, req ClusterReq,
 	return candidateClusters, err
 }
 
-func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, clonename string) (*VolumeEntry, error) {
+func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, clonename string) (*VolumeEntry, []*BrickEntry, []*DeviceEntry, error) {
 	vcr, host, err := v.cloneVolumeRequest(db, clonename)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	clone, err := executor.VolumeClone(host, vcr)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	vol := NewVolumeEntryFromClone(v, clone)
-	return vol, nil
+	// vol.Bricks is still empty, it should contain UUIDs for each new brick, done below.
+
+	bricks := []*BrickEntry{}
+	devices := []*DeviceEntry{}
+	err = db.View(func(tx *bolt.Tx) error {
+		for _, b := range v.Bricks {
+			brick, err := CloneBrickEntryFromId(tx, b)
+			if err != nil {
+				return err
+			}
+			// TODO: set correct brick.Info.Path
+			// Need to find a way to match the bricks from clone with the original bricks?
+			brick.Info.VolumeId = vol.Info.Id
+			brick.Info.Path = "<maintained-by-glusterd-for-cloned-volume:" + vol.Info.Id + ">"
+
+			vol.Bricks = append(vol.Bricks, brick.Id())
+			bricks = append(bricks, brick)
+
+			// Add the cloned brick to the device
+			device, err := NewDeviceEntryFromId(tx, brick.Info.DeviceId)
+			device.BrickAdd(brick.Id())
+			devices = append(devices, device)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return vol, bricks, devices, nil
 }
 
 func (v *VolumeEntry) cloneVolumeRequest(db wdb.RODB, clonename string) (*executors.VolumeCloneRequest, string, error) {

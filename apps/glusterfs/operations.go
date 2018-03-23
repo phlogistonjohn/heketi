@@ -442,9 +442,17 @@ func (vdel *VolumeDeleteOperation) Finalize() error {
 // clone an existing volume.
 type VolumeCloneOperation struct {
 	OperationManager
-	vol       *VolumeEntry
+
+	// The volume to use as source for the clone
+	vol *VolumeEntry
+	// Optional name for the new volume
 	clonename string
-	clone     *VolumeEntry
+	// The newly cloned volume, will be set in Exec()
+	clone *VolumeEntry
+	// The bricks for the clone
+	bricks []*BrickEntry
+	// The devices of the bricks
+	devices []*DeviceEntry
 }
 
 func NewVolumeCloneOperation(
@@ -473,6 +481,9 @@ func (vc *VolumeCloneOperation) Build() error {
 	// TODO: finish the implementation...
 	return vc.db.Update(func(tx *bolt.Tx) error {
 		vc.op.RecordCloneVolume(vc.vol)
+		// TODO: the DeviceEntry's of the volume will be updated too (how to lock them?)
+		// Or create the *Entry's here with UUIDs, and then fill the other attributes?
+		// That way the DeviceEntry.Bricks can refer to the new cloned BrickEntry's...
 		if e := vc.vol.Save(tx); e != nil {
 			return e
 		}
@@ -485,7 +496,8 @@ func (vc *VolumeCloneOperation) Build() error {
 
 func (vc *VolumeCloneOperation) Exec(executor executors.Executor) error {
 	// TODO: finish the implementation...
-	clone, err := vc.vol.cloneVolumeExec(vc.db, executor, vc.clonename)
+	// Wow, number of return values is increasing rapidly!
+	clone, bricks, devices, err := vc.vol.cloneVolumeExec(vc.db, executor, vc.clonename)
 	if err != nil {
 		logger.LogError("Error executing clone volume: %v", err)
 		return err
@@ -493,6 +505,8 @@ func (vc *VolumeCloneOperation) Exec(executor executors.Executor) error {
 
 	// Store the newly cloned volume in the VolumeCloneOperation
 	vc.clone = clone
+	vc.bricks = bricks
+	vc.devices = devices
 	return nil
 }
 
@@ -518,6 +532,14 @@ func (vc *VolumeCloneOperation) Finalize() error {
 		}
 		if err := vc.clone.Save(tx); err != nil {
 			return err
+		}
+		// TODO: Save() the BrickEntry's
+		for _, b := range vc.bricks {
+			b.Save(tx)
+		}
+		// TODO: the DeviceEntry of each brick was updated too!
+		for _, d := range vc.devices {
+			d.Save(tx)
 		}
 
 		vc.op.Delete(tx)
