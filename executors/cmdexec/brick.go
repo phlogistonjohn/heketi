@@ -142,6 +142,7 @@ func (s *CmdExecutor) BrickDestroy(host string,
 	}
 
 	// Remove from fstab
+	// TODO: bricks of cloned volumes do not have an entry in fstab, this can be skipped
 	commands = []string{
 		fmt.Sprintf("sed -i.save \"/%v/d\" %v",
 			utils.BrickIdToName(brick.Name),
@@ -173,6 +174,7 @@ func (s *CmdExecutor) BrickDestroyCheck(host string,
 // Determine if any other logical volumes are using the thin pool.
 // If they are, then either a clone volume or a snapshot is using that storage,
 // and we cannot delete the brick.
+// TODO: the brick LV can be deleted for cloned volumes, but the thin pool needs to stay
 func (s *CmdExecutor) checkThinPoolUsage(host string,
 	brick *executors.BrickRequest) error {
 
