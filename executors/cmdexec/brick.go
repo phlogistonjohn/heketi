@@ -113,10 +113,9 @@ func (s *CmdExecutor) BrickDestroy(host string,
 	godbc.Require(brick.Name != "")
 	godbc.Require(brick.VgId != "")
 
-	mp := utils.BrickMountPoint(brick.VgId, brick.Name)
 	// Try to unmount first
 	commands := []string{
-		fmt.Sprintf("umount %v", mp),
+		fmt.Sprintf("umount %v", brick.Path),
 	}
 	_, err := s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
 	if err != nil {
@@ -124,6 +123,7 @@ func (s *CmdExecutor) BrickDestroy(host string,
 	}
 
 	// Now try to remove the LV
+	// TODO: only call lvremove on the tp_* LV if there are no other users
 	commands = []string{
 		fmt.Sprintf("lvremove -f %v", utils.BrickThinLvName(brick.VgId, brick.Name)),
 	}
@@ -134,7 +134,7 @@ func (s *CmdExecutor) BrickDestroy(host string,
 
 	// Now cleanup the mount point
 	commands = []string{
-		fmt.Sprintf("rmdir %v", mp),
+		fmt.Sprintf("rmdir %v", brick.Path),
 	}
 	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
 	if err != nil {
@@ -142,15 +142,17 @@ func (s *CmdExecutor) BrickDestroy(host string,
 	}
 
 	// Remove from fstab
-	// TODO: bricks of cloned volumes do not have an entry in fstab, this can be skipped
-	commands = []string{
-		fmt.Sprintf("sed -i.save \"/%v/d\" %v",
-			utils.BrickIdToName(brick.Name),
-			s.Fstab),
-	}
-	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
-	if err != nil {
-		logger.Err(err)
+	// If the brick.Path contains "(/var)?/run/gluster/", there is no entry in fstab as GlusterD manages it.
+	if (!(strings.HasPrefix(brick.Path, "/run/gluster/") || strings.HasPrefix(brick.Path, "/var/run/gluster/"))) {
+		commands = []string{
+			fmt.Sprintf("sed -i.save \"/%v/d\" %v",
+				utils.BrickIdToName(brick.Name),
+				s.Fstab),
+		}
+		_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+		if err != nil {
+			logger.Err(err)
+		}
 	}
 
 	return nil

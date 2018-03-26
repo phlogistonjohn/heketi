@@ -12,6 +12,7 @@ package glusterfs
 import (
 	"bytes"
 	"encoding/gob"
+	"strings"
 
 	"github.com/boltdb/bolt"
 	"github.com/heketi/heketi/executors"
@@ -213,6 +214,7 @@ func (b *BrickEntry) Destroy(db wdb.RODB, executor executors.Executor) error {
 	req.Size = b.Info.Size
 	req.TpSize = b.TpSize
 	req.VgId = b.Info.DeviceId
+	req.Path = strings.TrimSuffix(b.Info.Path, "/brick")
 
 	// Delete brick on node
 	logger.Info("Deleting brick %v", b.Info.Id)
@@ -253,7 +255,11 @@ func (b *BrickEntry) DestroyCheck(db wdb.RODB, executor executors.Executor) erro
 	req.VgId = b.Info.DeviceId
 
 	// Check brick on node
-	return executor.BrickDestroyCheck(host, req)
+	err = executor.BrickDestroyCheck(host, req)
+	if err != nil {
+		logger.Info("thin-p LV can not be freed yet: %v", err)
+	}
+	return nil // TODO: return a status like "keep thin-p"
 }
 
 // Size consumed on device
