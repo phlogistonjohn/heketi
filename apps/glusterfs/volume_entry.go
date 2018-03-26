@@ -761,6 +761,12 @@ func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, cl
 		return nil, nil, nil, err
 	}
 
+	// get all details of the original volume (order of bricks etc)
+	orig, err := executor.VolumeInfo(host, v.Info.Name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	clone, err := executor.VolumeClone(host, vcr)
 	if err != nil {
 		return nil, nil, nil, err
@@ -769,18 +775,56 @@ func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, cl
 	vol := NewVolumeEntryFromClone(v, clone)
 	// vol.Bricks is still empty, it should contain UUIDs for each new brick, done below.
 
+	type BrickMatch struct {
+		host      string
+		origPath  string
+		clonePath string
+	}
+
+	bms := []*BrickMatch{}
+	for _, b := range clone.Bricks.BrickList {
+		bm := &BrickMatch{}
+		bm.host = strings.Split(b.Name, ":")[0]
+		bm.clonePath = strings.Split(b.Name, ":")[1]
+		bms = append(bms, bm)
+	}
+
+	for i, b := range orig.Bricks.BrickList {
+		// TODO: compare hostUUID? Needs to be the same.
+		bms[i].origPath = strings.Split(b.Name, ":")[1]
+	}
+
 	bricks := []*BrickEntry{}
 	devices := []*DeviceEntry{}
 	err = db.View(func(tx *bolt.Tx) error {
-		for _, b := range v.Bricks {
-			brick, err := CloneBrickEntryFromId(tx, b)
-			if err != nil {
-				return err
+		for _, bm := range bms {
+			// TODO: loop throug all v.Bricks and match the .Info.Path with bm.origPath
+			var brick *BrickEntry
+			var err error
+			for _, b := range v.Bricks {
+				origBrick, err := NewBrickEntryFromId(tx, b)
+				if err != nil {
+					break
+				}
+
+				if origBrick.Info.Path != bm.origPath {
+					continue
+				}
+
+				brick, err = CloneBrickEntryFromId(tx, b)
+				if err != nil {
+					break
+				}
 			}
+
+			if brick == nil {
+				return fmt.Errorf("failed to find brick %v: %v", bm.origPath, err)
+			}
+
 			// TODO: set correct brick.Info.Path
 			// Need to find a way to match the bricks from clone with the original bricks?
 			brick.Info.VolumeId = vol.Info.Id
-			brick.Info.Path = "<maintained-by-glusterd-for-cloned-volume:" + vol.Info.Id + ">"
+			brick.Info.Path = bm.clonePath
 
 			vol.Bricks = append(vol.Bricks, brick.Id())
 			bricks = append(bricks, brick)
