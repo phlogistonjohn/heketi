@@ -478,7 +478,7 @@ func (bvc *BlockVolumeCreateOperation) Build(allocator Allocator) error {
 				}
 			}
 			bvc.op.RecordAddHostingVolume(vol)
-			if e := bvc.bvol.Save(tx); e != nil {
+			if e := vol.Save(tx); e != nil {
 				return e
 			}
 			bvc.bvol.Info.BlockHostingVolume = vol.Info.Id
