@@ -22,7 +22,6 @@ type MockExecutor struct {
 	MockDeviceTeardown           func(host, device, vgid string) error
 	MockBrickCreate              func(host string, brick *executors.BrickRequest) (*executors.BrickInfo, error)
 	MockBrickDestroy             func(host string, brick *executors.BrickRequest) error
-	MockBrickDestroyCheck        func(host string, brick *executors.BrickRequest) error
 	MockVolumeCreate             func(host string, volume *executors.VolumeRequest) (*executors.Volume, error)
 	MockVolumeExpand             func(host string, volume *executors.VolumeRequest) (*executors.Volume, error)
 	MockVolumeDestroy            func(host string, volume string) error
@@ -73,10 +72,6 @@ func NewMockExecutor() (*MockExecutor, error) {
 	}
 
 	m.MockBrickDestroy = func(host string, brick *executors.BrickRequest) error {
-		return nil
-	}
-
-	m.MockBrickDestroyCheck = func(host string, brick *executors.BrickRequest) error {
 		return nil
 	}
 
@@ -219,10 +214,6 @@ func (m *MockExecutor) BrickCreate(host string, brick *executors.BrickRequest) (
 
 func (m *MockExecutor) BrickDestroy(host string, brick *executors.BrickRequest) error {
 	return m.MockBrickDestroy(host, brick)
-}
-
-func (m *MockExecutor) BrickDestroyCheck(host string, brick *executors.BrickRequest) error {
-	return m.MockBrickDestroyCheck(host, brick)
 }
 
 func (m *MockExecutor) VolumeCreate(host string, volume *executors.VolumeRequest) (*executors.Volume, error) {

@@ -243,23 +243,9 @@ func (b *BrickEntry) DestroyCheck(db wdb.RODB, executor executors.Executor) erro
 		godbc.Check(host != "")
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 
-	// Create request
-	req := &executors.BrickRequest{}
-	req.Name = b.Info.Id
-	req.Size = b.Info.Size
-	req.TpSize = b.TpSize
-	req.VgId = b.Info.DeviceId
-
-	// Check brick on node
-	err = executor.BrickDestroyCheck(host, req)
-	if err != nil {
-		logger.Info("thin-p LV can not be freed yet: %v", err)
-	}
-	return nil // TODO: return a status like "keep thin-p"
+	// TODO: any additional checks in the DB? The detection of the VG/LV and its users is done in cmdexec.BrickDestroy()
+	return err
 }
 
 // Size consumed on device
