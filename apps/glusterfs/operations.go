@@ -526,6 +526,15 @@ func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
 func (vc *VolumeCloneOperation) Finalize() error {
 	// TODO: finalize the implementation ...
 	return vc.db.Update(func(tx *bolt.Tx) error {
+		// hack alert! -jjm
+		c, err := NewClusterEntryFromId(tx, vc.vol.Info.Cluster)
+		if err != nil {
+			return err
+		}
+		c.VolumeAdd(vc.clone.Info.Id)
+		if err := c.Save(tx); err != nil {
+			return err
+		}
 		vc.op.FinalizeVolumeClone(vc.vol)
 		if err := vc.vol.Save(tx); err != nil {
 			return err
