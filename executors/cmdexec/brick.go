@@ -112,20 +112,49 @@ func (s *CmdExecutor) BrickDestroy(host string,
 	godbc.Require(host != "")
 	godbc.Require(brick.Name != "")
 	godbc.Require(brick.VgId != "")
+	godbc.Require(brick.Path != "")
+
+	// Cloned bricks do not follow 'our' VG/LV naming, detect it.
+	commands := []string{
+		fmt.Sprintf("mount | grep -w %v | cut -d\" \" -f1", brick.Path),
+	}
+	output, err := s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+	if err != nil {
+		logger.Err(err)
+	}
+	dev := output[0]
+	// detect the thinp LV used by this brick (in "vg_.../tp_..." format)
+	commands = []string{
+		fmt.Sprintf("lvs --noheadings --separator=/ -ovg_name,pool_lv %v", dev),
+	}
+	output, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+	if err != nil {
+		logger.Err(err)
+	}
+	tp := output[0]
 
 	// Try to unmount first
-	commands := []string{
+	commands = []string{
 		fmt.Sprintf("umount %v", brick.Path),
 	}
-	_, err := s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
 	if err != nil {
 		logger.Err(err)
 	}
 
-	// Now try to remove the LV
-	// TODO: only call lvremove on the tp_* LV if there are no other users
+	// Remove the LV (by device name)
 	commands = []string{
-		fmt.Sprintf("lvremove -f %v", utils.BrickThinLvName(brick.VgId, brick.Name)),
+		fmt.Sprintf("lvremove -f %v", dev),
+	}
+	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+	if err != nil {
+		logger.Err(err)
+	}
+
+	// Remove the thin-pool
+	// TODO: skip if there are more than one users of the tp
+	commands = []string{
+		fmt.Sprintf("lvremove -f %v", tp),
 	}
 	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
 	if err != nil {
