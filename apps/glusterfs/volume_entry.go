@@ -155,12 +155,16 @@ func NewVolumeEntryFromId(tx *bolt.Tx, id string) (*VolumeEntry, error) {
 	return entry, nil
 }
 
-func NewVolumeEntryFromClone(v *VolumeEntry, clone *executors.Volume) *VolumeEntry {
+func NewVolumeEntryFromClone(v *VolumeEntry, name string) *VolumeEntry {
 	entry := NewVolumeEntry()
 
-	entry.Info.Name = clone.VolumeName
-	// TODO: it would be nice to have the Id match the "vol_"+Id name
+
 	entry.Info.Id = utils.GenUUID()
+	if name == "" {
+		entry.Info.Name = "vol_" + entry.Info.Id
+	} else {
+		entry.Info.Name = name
+	}
 
 	entry.GlusterVolumeOptions = v.GlusterVolumeOptions
 	entry.Info.Cluster = v.Info.Cluster
@@ -755,8 +759,15 @@ func eligibleClusters(db wdb.RODB, req ClusterReq,
 	return candidateClusters, err
 }
 
+
+func (v *VolumeEntry) prepareVolumeClone(tx *bolt.Tx) {
+}
+
 func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, clonename string) (*VolumeEntry, []*BrickEntry, []*DeviceEntry, error) {
-	vcr, host, err := v.cloneVolumeRequest(db, clonename)
+	vol := NewVolumeEntryFromClone(v, clonename)
+	// vol.Bricks is still empty, it should contain UUIDs for each new brick, done below.
+
+	vcr, host, err := v.cloneVolumeRequest(db, vol.Info.Name)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -771,9 +782,6 @@ func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, cl
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	vol := NewVolumeEntryFromClone(v, clone)
-	// vol.Bricks is still empty, it should contain UUIDs for each new brick, done below.
 
 	type BrickMatch struct {
 		host      string
@@ -845,16 +853,12 @@ func (v *VolumeEntry) cloneVolumeExec(db wdb.DB, executor executors.Executor, cl
 
 func (v *VolumeEntry) cloneVolumeRequest(db wdb.RODB, clonename string) (*executors.VolumeCloneRequest, string, error) {
 	godbc.Require(db != nil)
+	godbc.Require(clonename != "")
 
 	// Setup list of bricks
 	vcr := &executors.VolumeCloneRequest{}
 	vcr.Volume = v.Info.Name
-
-	if clonename != "" {
-		vcr.Clone = clonename
-	} else {
-		vcr.Clone = "vol_" + utils.GenUUID()
-	}
+	vcr.Clone = clonename
 
 	var sshhost string
 	err := db.View(func(tx *bolt.Tx) error {
