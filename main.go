@@ -87,6 +87,59 @@ var stressCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("This is exec stress test. Do not use if not devel.")
 		fmt.Println("It may break your cluster or make puppies cry.")
+
+		type Plan struct {
+			Target string `json:"target"`
+			Delay int `json:"delay"`
+			Timeout int `json:"timeout"`
+			Commands []string `json:"commands"`
+		}
+		type Plans []Plan
+
+		p, _ := cmd.Flags().GetString("plan")
+		fp, e := os.Open(p)
+		if e != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", e)
+			os.Exit(1)
+		}
+		defer fp.Close()
+		plans := Plans{}
+		configParser := json.NewDecoder(fp)
+		if e = configParser.Decode(&plans); e != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", e)
+			os.Exit(1)
+		}
+
+		options, err := config.ReadConfig(configfile)
+		if err != nil {
+			os.Exit(1)
+		}
+		app := setupApp(options)
+
+		for _, plan := range plans {
+			go func() {
+				fmt.Printf("Started job for: %v\n", plan.Target)
+				for {
+					time.Sleep(time.Duration(plan.Delay) * time.Second)
+					glusterfs.ExecWithApp(
+						app,
+						plan.Target,
+						plan.Commands,
+						plan.Timeout)
+					if err != nil {
+						fmt.Printf("err: %v\n", err)
+					} else {
+						fmt.Printf(".\n")
+					}
+				}
+			}()
+		}
+
+		for {
+			time.Sleep(time.Second)
+		}
+
+		os.Exit(0)
 	},
 }
 
@@ -365,6 +418,8 @@ func init() {
 	examineGlusterCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
 
 	RootCmd.AddCommand(stressCmd)
+	stressCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
+	stressCmd.Flags().StringP("plan", "p", "", "Plan file")
 	stressCmd.SilenceUsage = true
 }
 
