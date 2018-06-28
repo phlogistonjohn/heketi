@@ -80,6 +80,16 @@ var offlineCmd = &cobra.Command{
 	Long:  "perform offline operations",
 }
 
+var stressCmd = &cobra.Command{
+	Use: "stress",
+	Short: "exec stress test",
+	Long: "exec stress test",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("This is exec stress test. Do not use if not devel.")
+		fmt.Println("It may break your cluster or make puppies cry.")
+	},
+}
+
 var importdbCmd = &cobra.Command{
 	Use:     "import",
 	Short:   "import creates a db file from JSON input",
@@ -354,6 +364,8 @@ func init() {
 	examineGlusterCmd.SilenceUsage = true
 	examineGlusterCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
 
+	RootCmd.AddCommand(stressCmd)
+	stressCmd.SilenceUsage = true
 }
 
 func setWithEnvVariables(options *config.Config) {
