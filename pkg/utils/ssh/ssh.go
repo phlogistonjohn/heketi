@@ -112,10 +112,191 @@ func NewSshExecWithPassword(logger *utils.Logger, user string, password string) 
 	return sshexec
 }
 
+type ExecConf struct {
+	StopOnError bool
+	CommandTimeout time.Duration
+	UseSudo bool
+}
+
+type CmdResult struct {
+	Completed bool
+	ExitStatus int
+	Output string
+	ErrOutput string
+}
+
+func (r CmdResult) Failed() bool {
+	return !r.Completed || r.ExitStatus != 0
+}
+
+type CmdResults []CmdResult
+
+
+func (s *SshExec) RunMany(
+	host string, commands []string, cfg ExecConf) (CmdResults, error) {
+
+	cres := make(CmdResults, len(commands))
+
+	client, err := ssh.Dial("tcp", host, s.clientConfig)
+	if err != nil {
+		s.logger.Warning("Failed to create SSH connection to %v: %v", host, err)
+		return nil, err
+	}
+	defer client.Close()
+
+	resultCh := make(chan error)
+	defer close(resultCh)
+
+	for i, command := range commands {
+		session, err := client.NewSession()
+		if err != nil {
+			s.logger.LogError("Unable to create SSH session: %v", err)
+			return cres, err
+		}
+		defer session.Close()
+
+		// Create buffers to trap session output
+		var bout bytes.Buffer
+		var berr bytes.Buffer
+		session.Stdout = &bout
+		session.Stderr = &berr
+
+		if cfg.UseSudo {
+			command = "sudo " + command
+		}
+		// Execute command in a shell
+		command = "/bin/bash -c '" + command + "'"
+
+		err = session.Start(command)
+		if err != nil {
+			return cres, err
+		}
+
+		go func() {
+			resultCh <- session.Wait()
+		}()
+
+		// Set the timeout
+		timeout := time.After(cfg.CommandTimeout)
+
+		// Wait for either the command completion or timeout
+		select {
+		case err := <-resultCh:
+			r, err := s.convertResult(host, command, err, bout, berr)
+			cres[i] = r
+			if err != nil {
+				return cres, err
+			}
+			if r.Failed() && cfg.StopOnError {
+				return cres, nil
+			}
+
+		case <-timeout:
+			return cres, s.handleTimeout(host, command, session, cfg.CommandTimeout)
+		}
+	}
+	return cres, nil
+}
+
+func (s *SshExec) convertResult(
+	host, command string,
+	sessErr error, bout, berr bytes.Buffer) (CmdResult, error) {
+
+	if sessErr == nil {
+		r := CmdResult{
+			Completed: true,
+			Output: bout.String(),
+			ErrOutput: berr.String(),
+			ExitStatus: 0,
+		}
+		s.logger.Debug(
+			"Ran command [%v] on %v: Output: [%v] ErrOutput: [%v]",
+			command, host, r.Output, r.ErrOutput)
+		return r, nil
+	}
+
+	var (
+		sout = bout.String()
+		serr = berr.String()
+	)
+	s.logger.LogError(
+		"Failed to run command [%v] on %v: Err[%v]: Stdout [%v]: Stderr [%v]",
+		command, host, sessErr, sout, serr)
+
+	if ee, ok := sessErr.(*ssh.ExitError); ok {
+		r := CmdResult{
+			Completed: true,
+			Output: sout,
+			ErrOutput: serr,
+			ExitStatus: ee.ExitStatus(),
+		}
+		return r, nil
+	}
+	r := CmdResult{
+		Completed: false,
+		Output: sout,
+		ErrOutput: serr,
+	}
+	return r, sessErr
+}
+
+func (s *SshExec) handleTimeout(
+	host, command string,
+	session *ssh.Session, after time.Duration) error {
+	s.logger.LogError(
+		"Timeout on command [%v] on %v", command, host)
+	err := session.Signal(ssh.SIGKILL)
+	if err != nil {
+		s.logger.LogError(
+			"Unable to send kill signal to command [%v] on host [%v]: %v",
+			command, host, err)
+	}
+	return NewSshTimeoutError(host, after)
+}
+
+type SshTimeoutError struct {
+	Host string
+	After time.Duration
+}
+
+func NewSshTimeoutError(host string, after time.Duration) *SshTimeoutError {
+	return &SshTimeoutError{
+		Host: host,
+		After: after,
+	}
+}
+
+func (s *SshTimeoutError) Error() string {
+	return fmt.Sprintf("SSH command timeout on [%v] after [%v]",
+		s.Host, s.After.String())
+}
+
 // This function was based from https://github.com/coreos/etcd-manager/blob/master/main.go
 func (s *SshExec) ConnectAndExec(host string, commands []string, timeoutMinutes int, useSudo bool) ([]string, error) {
 
 	buffers := make([]string, len(commands))
+	res, err := s.RunMany(host, commands, ExecConf{
+		StopOnError: true,
+		UseSudo: useSudo,
+		CommandTimeout: time.Minute * time.Duration(timeoutMinutes),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i, r := range res {
+		if !r.Completed {
+			continue
+		}
+		if r.ExitStatus == 0 {
+			buffers[i] = r.Output
+		} else {
+			return nil, errors.New(r.ErrOutput)
+		}
+	}
+	return buffers, nil
+}
+
+/*
 
 	// :TODO: Will need a timeout here in case the server does not respond
 	client, err := ssh.Dial("tcp", host, s.clientConfig)
@@ -187,3 +368,4 @@ func (s *SshExec) ConnectAndExec(host string, commands []string, timeoutMinutes 
 
 	return buffers, nil
 }
+*/
