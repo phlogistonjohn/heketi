@@ -4,15 +4,19 @@ import argparse
 import fnmatch
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import time
+import yaml
 
 try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+    from urllib.request import urlopen
+except:
+    from urllib2 import urlopen
 
+
+CONFIG_NAME = 'testgroup.yaml'
 
 log = logging.getLogger("funrun")
 
@@ -21,7 +25,7 @@ class Fail(Exception):
     pass
 
 
-SUITES = [
+DIRS = [
     "TestSelfTest",
     "TestSmokeTest",
     "TestVolumeNotDeletedWhenNodeIsDown",
@@ -34,25 +38,101 @@ SUITES = [
 MIN_GO_VERSION = "1.8.3"
 
 
-class TestEnv(object):
-    def __init__(self, suite):
-        self.suite = suite
-
-    def setup(self):
-        raise NotImplementedError()
-
-    def teardown(self):
-        raise NotImplementedError()
-
-    def __enter__(self):
-        self.setup()
-        return self
-
-    def __exit__(self, ecls, err, tb=None):
-        self.teardown()
+class Filter(object):
+    def match(self, value):
+        return True
 
 
-class EmptyEnv(TestEnv):
+class TestSuite(object):
+    pass
+
+
+class GoTestSuite(TestSuite):
+    def __init__(self, package):
+        self.package = package
+
+    def __str__(self):
+        parent, pn = os.path.split(self.package)
+        pdn = os.path.basename(parent)
+        return 'Go Test Suite {}/{}'.format(pdn, pn)
+
+    def run(self, *args):
+        cmd = ['go', 'test', '-timeout=2h', '-tags', 'functional', '-v']
+        env = os.environ.copy()
+        # Go is a bit quirky about how it figures out what paths to
+        # look in for depencies (vendor dir). Setting PWD explicitly
+        # to the new dir seems to help.
+        env['PWD'] = self.package
+        sh(*cmd, cwd=self.package, env=env)
+
+
+class TestGroup(object):
+    def __init__(self, group_dir):
+        self.group_dir = group_dir
+        self.name = os.path.basename(group_dir)
+        self._defaults()
+        self._parse()
+
+    def _defaults(self):
+        self._vagrant = os.path.join(self.group_dir, 'vagrant')
+        if not os.path.isdir(self._vagrant):
+            self._vagrant = None
+        self._tests_dir = os.path.join(self.group_dir, 'tests')
+        if not os.path.isdir(self._tests_dir):
+            self._tests_dir = None
+
+    def _parse(self):
+        data = {}
+        tg_config = os.path.join(self.group_dir, CONFIG_NAME)
+        try:
+            with open(tg_config) as fh:
+                data = yaml.safe_load(fh)
+        except (OSError, IOError):
+            pass
+        if 'environments' in data:
+            pass
+        if 'suites' in data:
+            pass
+        else:
+            self._suites = []
+            if self._tests_dir:
+                self._suites.append(GoTestSuite(self._tests_dir))
+
+    def suites(self, filter=None):
+        return self._suites
+
+    def environments(self):
+        envs = []
+        if self._vagrant:
+            envs.append(VagrantEnv(self._vagrant))
+        if os.path.isdir(os.path.join(self.group_dir, 'config')):
+            envs.append(HeketiEnv(self.group_dir))
+        return envs
+
+    def __str__(self):
+        return self.name
+
+
+class TestCollection(object):
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+
+    def groups(self, filter=None):
+        for d in DIRS:
+            group_dir = os.path.join(self.base_dir, d)
+            if not os.path.isdir(group_dir):
+                continue
+            if not filter.match(d):
+                continue
+            yield TestGroup(group_dir)
+
+    def __str__(self):
+        return 'Source {}'.format(self.base_dir)
+
+
+class EmptyEnv(object):
+    name = 'none'
+
     def setup(self):
         pass
 
@@ -60,15 +140,14 @@ class EmptyEnv(TestEnv):
         pass
 
 
-class VagrantEnv(TestEnv):
-    def __init__(self, suite):
-        self.vagrant_dir = suite.vagrant_dir
+class VagrantEnv(object):
+    def __init__(self, vagrant_dir):
+        self.name = 'vagrant'
+        self.vagrant_dir = vagrant_dir
 
     def setup(self):
         log.info("Starting vagrant environment")
-        cmd = ['vagrant', 'up', '--no-provision']
-        kwargs = dict(cwd=self.vagrant_dir)
-        sh(*cmd, **kwargs)
+        sh('./up.sh', cwd=self.vagrant_dir)
 
     def teardown(self):
         log.info("Stopping vagrant environment")
@@ -77,98 +156,64 @@ class VagrantEnv(TestEnv):
         except Fail as err:
             log.warning("unable to fully teardown vagrant environment")
 
+    def __str__(self):
+        return 'Vagrant'
 
-def _go_test_runner(packagedir):
-    cmd = ['go', 'test', '-timeout=2h', '-tags', 'functional', '-v']
-    #opts = dict(cwd=packagedir)
-    def runtests():
-        curdir = os.path.abspath('.')
-        os.chdir(packagedir)
+
+class HeketiEnv(object):
+    def __init__(self, run_dir):
+        self.name = 'heketi'
+        self.run_dir = run_dir
+        self._proc = None
+
+    def setup(self):
+        d = os.path.dirname
+        heketi_dir = d(d(d(self.run_dir)))
+        env = os.environ.copy()
+        env['PWD'] = heketi_dir
+        sh('go', 'build', cwd=heketi_dir, env=env)
+        shutil.copy(
+            os.path.join(heketi_dir, 'heketi'),
+            os.path.join(self.run_dir, 'heketi-server'))
+
+        dbpath = os.path.join(self.run_dir, 'heketi.db')
         try:
-            sh(*cmd)
-        finally:
-            os.chdir(curdir)
-    return runtests
+            os.unlink(dbpath)
+        except OSError:
+            pass
+        log.info("RUN DIR %s", self.run_dir)
+        self._proc = subprocess.Popen(
+            ['./heketi-server', '--config=config/heketi.json'],
+            cwd=self.run_dir)
+        for _ in range(0, 60):
+            try:
+                r = urlopen('http://localhost:8080/hello')
+                if r.status != 200:
+                    raise ValueError('not alive')
+                found = True
+            except Exception:
+                log.debug("unable to connect to server")
+                time.sleep(1)
+        if not found:
+            raise Fail("unable to connect to heketi server")
 
-
-class TestGroup(object):
-    def __init__(self, suite, name):
-        self.suite = suite
-        self.name = name
-
-    @classmethod
-    def from_config(cls, suite, name, cfg):
-        g = cls(suite, name)
-        ttype = cfg.get('type', 'gotest')
-        if ttype == 'gotest':
-            g.runner = _go_test_runner(
-                packagedir=os.path.join(suite.path, cfg['package']))
-        elif ttype == 'script':
-            g.runner = _script_test_runner(
-                path=os.path.join(suite.path, cfg['path']))
-        else:
-            raise Fail("invalid test group type: {}".format(ttype))
-        return g
-
-    def run(self):
-        log.info("Running test group: %s", self.name)
-        runtests = self.runner()
-        try:
-            runtests()
-            return True
-        except Fail:
-            log.error("test group failed: {}".format(self.name))
-            return False
-
-
-
-class TestSuite(object):
-    def __init__(self, cli, name):
-        self.name = name
-        self.path = os.path.join(cli.func_tests, name)
-        self.vagrant_dir = os.path.join(self.path, 'xxxvagrant')
-        self._has_vagrant = os.path.isdir(self.vagrant_dir)
-
-    def environment(self):
-        if self._has_vagrant:
-            return VagrantEnv(self)
-        return EmptyEnv(self)
-
-    def groups(self):
-        try:
-            return self._config_groups()
-        except Fail:
-            return self._auto_groups()
-
-    def _config_groups(self):
-        tests_cfg = os.path.join(self.path, 'suite.ini')
-        try:
-            with open(tests_cfg) as fh:
-                cfg = configparser.SafeConfigParser()
-                cfg.readfp(fh)
-        except (IOError, OSError):
-            raise Fail("no config file in suite {}".format(self.name))
-        groups = cfg.get("suite", "groups").split()
-        return [TestGroup.from_config(self, name, dict(cfg.items(name)))
-                for name in groups]
-
-    def _auto_groups(self):
-        tests_dir = os.path.join(self.path, 'tests')
-        if os.path.isdir(tests_dir):
-            return [TestGroup.from_config(self, 'tests', {})]
-        return []
+    def teardown(self):
+        self._proc.terminate()
 
     def __str__(self):
-        return self.name
+        return 'Heketi Server'
 
 
 def sh(*args, **kwargs):
+    log.debug("running: %s", args)
     try:
         subprocess.check_call(args, **kwargs)
     except subprocess.CalledProcessError as e:
         raise Fail('command failed: {}, exit: {}'.format(args, e.returncode))
 
+
 def cmd_quiet(*args):
+    log.debug("running: %s", args)
     try:
         with open(os.devnull, 'w') as fh:
             subprocess.check_call(args, stdout=fh)
@@ -177,6 +222,7 @@ def cmd_quiet(*args):
 
 
 def cmd_output(*args):
+    log.debug("running: %s", args)
     try:
         return subprocess.check_output(args).decode('utf8')
     except subprocess.CalledProcessError as e:
@@ -191,7 +237,7 @@ def check_prereqs():
     try:
         cmd_quiet('glide', '--help')
     except Fail:
-        raise Fail('"glide" tool not found - glide is required to build server')
+        raise Fail('"glide" tool not found: glide is required to build server')
     gversion = cmd_output('go', 'version').split()[2].replace('go', '')
     need_version = tuple(int(v) for v in MIN_GO_VERSION.split('.'))
     go_version = tuple(int(v) for v in gversion.split('.'))
@@ -201,33 +247,91 @@ def check_prereqs():
     return
 
 
-def get_suites(cli):
-    suites = fnmatch.filter(SUITES, cli.test_suite)
-    return [TestSuite(cli, name) for name in suites]
+def parse_cli():
+    curdir = os.path.abspath(os.environ.get('PWD', '.'))
+    script_dir = os.path.dirname(sys.argv[0])
+
+    parser = argparse.ArgumentParser()
+    parser.set_defaults(
+        curdir=curdir,
+        script_dir=script_dir,
+        base_dir=os.path.abspath(os.path.join(curdir, script_dir)),
+        )
+    parser.add_argument('--dry-run', '-n', action='store_true')
+    parser.add_argument('--disable-env', '-E', action='append')
+    parser.add_argument('--base-dir')
+    parser.add_argument("--test-suite", "-s", default=Filter())
+    parser.add_argument("--test-group", "-g", default=Filter())
+
+    return parser.parse_args()
 
 
-def get_groups(cli, suite_groups):
-    print ("XXX", [g.name for g in suite_groups])
-    x = [g for g in suite_groups if fnmatch.fnmatch(g.name, cli.test_group)]
-    print ("TTT", x)
-    return x
+class ManageEnv(object):
+    def __init__(self, cli, envs):
+        self.envs = []
+        for env in envs:
+            log.info('Supported Environment: %s', env)
+            if cli.dry_run:
+                continue
+            if cli.disable_env and env.name in cli.disable_env:
+                log.info('Disabled Environment: %s', env)
+                continue
+            log.info('Enabling Environment: %s', env)
+            self.envs.append(env)
+
+    def __enter__(self):
+        for env in self.envs:
+            env.setup()
+        return self
+
+    def __exit__(self, ecls, err, tb=None):
+        for env in reversed(self.envs):
+            env.teardown()
+
+
+def exec_suite(cli, test_group, test_suite):
+    if cli.dry_run:
+        return
+    try:
+        test_suite.run()
+        error = None
+    except Exception as err:
+        error = str(err)
+    return {
+        'group': str(test_group),
+        'suite': str(test_suite),
+        'error': error,
+    }
 
 
 def process_results(results, start_time):
-    print ("XXX", results, start_time)
+    failed = False
+    for result in results:
+        if result.get('error'):
+            print ('FAILED {group} - {suite}'.format(**result))
+            failed = True
+        else:
+            print ('PASSED {group} - {suite}'.format(**result))
+    return not failed
 
 
-def parse_cli():
-    curdir = os.path.abspath('.')
-    script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+def run(cli):
+    check_prereqs()
+    # See https://bugzilla.redhat.com/show_bug.cgi?id=1327740
+    # _sudo setenforce 0
 
-    parser = argparse.ArgumentParser()
-    parser.set_defaults(curdir=curdir, script_dir=script_dir)
-    parser.add_argument('--func-tests', default=script_dir)
-    parser.add_argument("--test-suite", "-s", default='*')
-    parser.add_argument("--test-group", "-g", default='*')
-
-    return parser.parse_args()
+    results = []
+    tc = TestCollection(cli.base_dir)
+    # TODO: pre-clean environments
+    start_time = time.time()
+    log.info("Found functional test: %s", tc)
+    for tg in tc.groups(filter=cli.test_group):
+        log.info("Found test group: %s", tg)
+        with ManageEnv(cli, tg.environments()):
+            for ts in tg.suites(filter=cli.test_suite):
+                log.info("Found test suite: %s", ts)
+                results.append(exec_suite(cli, tg, ts))
+    return process_results(results, start_time)
 
 
 def main():
@@ -236,22 +340,8 @@ def main():
         level=logging.DEBUG)
     print (cli)
     try:
-        check_prereqs()
-        # See https://bugzilla.redhat.com/show_bug.cgi?id=1327740
-        #_sudo setenforce 0
-        suites = get_suites(cli)
-        for suite in suites:
-            suite.environment().teardown()
-        start_time = time.time()
-        results = []
-        log.debug("Starting functional tests")
-        for suite in suites:
-            log.info("Running suite: %s", suite)
-            with suite.environment():
-                for group in get_groups(cli, suite.groups()):
-                    print ("NNN", group)
-                    results.append(group.run())
-        if process_results(results, start_time):
+        results = run(cli)
+        if results:
             sys.exit(0)
         else:
             sys.exit(1)
