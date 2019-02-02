@@ -35,8 +35,15 @@ func (a *App) Auth(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 	token := data.(*jwt.Token)
 	claims := token.Claims.(*middleware.HeketiJwtClaims)
 
-	// Check access
-	if "user" == claims.Issuer && r.URL.Path != "/volumes" {
+	// isVolume is set to true if the url is a "volume path"
+	isVolume := false
+	if r.URL.Path[0] == '/' {
+		s := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/"), "/", 2)[0]
+		isVolume = (s == "volumes") || (s == "blockvolumes")
+	}
+	// Check access - "user" can add/delete/update/view volumes
+	// but nothing else
+	if "user" == claims.Issuer && isVolume {
 		http.Error(w, "Administrator access required", http.StatusUnauthorized)
 		return
 	}
