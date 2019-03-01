@@ -195,8 +195,13 @@ func (c *Client) checkRedirect(req *http.Request, via []*http.Request) error {
 	return c.setToken(req)
 }
 
+
+func (c *Client) pollResponse(r *http.Response) (*http.Response, error) {
+	return c.xwaitForResponseWithTimer(r, time.Millisecond*200)
+}
+
 // Wait for the job to finish, waiting waitTime on every loop
-func (c *Client) waitForResponseWithTimer(r *http.Response,
+func (c *Client) xwaitForResponseWithTimer(r *http.Response,
 	waitTime time.Duration) (*http.Response, error) {
 
 	// Get temp resource
