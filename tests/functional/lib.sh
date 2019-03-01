@@ -87,11 +87,13 @@ run_go_tests() {
     cd tests || fail "Unable to 'cd tests'."
     targs=()
     if [[ "$HEKETI_TEST_GO_TEST_RUN" ]]; then
-        targs+=("-run")
+        targs+=("-test.run")
         targs+=("$HEKETI_TEST_GO_TEST_RUN")
     fi
     export HEKETI_PID
-    time go test -timeout=2h -tags functional -v "${targs[@]}"
+    rm -f /tmp/functional.test
+    go test -c -o /tmp/functional.test -tags functional
+    time /tmp/functional.test -test.timeout=2h -test.v "${targs[@]}"
     gotest_result=$?
     echo "~~~ go test exited with ${gotest_result}"
     cd ..
