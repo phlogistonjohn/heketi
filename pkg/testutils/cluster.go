@@ -218,42 +218,49 @@ func (ce *ClusterEnv) Teardown(t *testing.T) {
 
 		// Delete nodes
 		for _, node := range clusterInfo.Nodes {
+			fmt.Println("CHUCK N", node)
 
 			// Get node information
 			nodeInfo, err := heketi.NodeInfo(node)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 			// Delete each device
-			sg := utils.NewStatusGroup()
+//			sg := utils.NewStatusGroup()
 			for _, device := range nodeInfo.DevicesInfo {
-				sg.Add(1)
-				go func(id string) {
-					defer sg.Done()
+				id := device.Id
+				fmt.Println("CHUCK D", device)
+//				sg.Add(1)
+//				go func(id string) {
+//					defer sg.Done()
 
 					stateReq := &api.StateRequest{}
 					stateReq.State = api.EntryStateOffline
 					err := heketi.DeviceState(id, stateReq)
-					if err != nil {
-						sg.Err(err)
-						return
-					}
+			tests.Assert(t, err == nil, "expected err == nil, got:", err)
+//					if err != nil {
+//						sg.Err(err)
+//						return
+//					}
 
 					stateReq.State = api.EntryStateFailed
 					err = heketi.DeviceState(id, stateReq)
-					if err != nil {
-						sg.Err(err)
-						return
-					}
+			tests.Assert(t, err == nil, "expected err == nil, got:", err)
+//					if err != nil {
+//						sg.Err(err)
+//						return
+//					}
 
 					err = heketi.DeviceDelete(id)
-					sg.Err(err)
+//					sg.Err(err)
 
-				}(device.Id)
+//				}(device.Id)
 			}
-			err = sg.Result()
+			fmt.Println("RRRRR")
+//			err = sg.Result()
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 			// Delete node
+			fmt.Println("NNNN")
 			err = heketi.NodeDelete(node)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		}
