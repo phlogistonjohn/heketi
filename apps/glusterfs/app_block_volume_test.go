@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
 	"github.com/heketi/tests"
 
@@ -747,7 +746,7 @@ func TestBlockVolumeListReadOnlyDb(t *testing.T) {
 	app.Close()
 
 	// Open Db here to force read only mode
-	db, err := bolt.Open(tmpfile, 0666, &bolt.Options{
+	db, err := wdb.Open(tmpfile, 0666, &wdb.Options{
 		ReadOnly: true,
 	})
 	tests.Assert(t, err == nil, err)
