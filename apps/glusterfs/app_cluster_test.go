@@ -18,11 +18,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func TestClusterCreate(t *testing.T) {
@@ -59,7 +60,7 @@ func TestClusterCreate(t *testing.T) {
 
 	// Check that the data on the database is recorded correctly
 	var entry ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		return entry.Unmarshal(
 			tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER)).
 				Get([]byte(msg.Id)))
@@ -94,7 +95,7 @@ func TestClusterSetFlags(t *testing.T) {
 	entry.Info.File = true
 	entry.Info.Block = true
 
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER))
 		if b == nil {
 			return errors.New("Unable to open bucket")
@@ -129,7 +130,7 @@ func TestClusterSetFlags(t *testing.T) {
 
 	// Check that the data on the database is recorded correctly
 	var ce ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		return ce.Unmarshal(
 			tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER)).
 				Get([]byte(clusterId)))
@@ -157,7 +158,7 @@ func TestClusterList(t *testing.T) {
 
 	// Save some objects in the database
 	numclusters := 5
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER))
 		if b == nil {
 			return errors.New("Unable to open bucket")
@@ -251,7 +252,7 @@ func TestClusterInfo(t *testing.T) {
 	}
 
 	// Save the info in the database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER))
 		if b == nil {
 			return errors.New("Unable to open bucket")
@@ -381,7 +382,7 @@ func TestClusterDelete(t *testing.T) {
 	clusters = append(clusters, cluster)
 
 	// Save the info in the database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		for _, entry := range clusters {
 			if err := EntrySave(tx, entry, entry.Info.Id); err != nil {
 				return err
@@ -433,7 +434,7 @@ func TestClusterDelete(t *testing.T) {
 	tests.Assert(t, r.StatusCode == http.StatusOK)
 
 	// Check database still has a1,a2, and a3, but not '000'
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(BOLTDB_BUCKET_CLUSTER))
 		if b == nil {
 			return errors.New("Unable to open bucket")

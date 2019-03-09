@@ -15,13 +15,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/boltdb/bolt"
-	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
 func buildCluster(app *App) {
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		// create a cluster
 		cluster_req := &api.ClusterCreateRequest{
 			ClusterFlags: api.ClusterFlags{
@@ -91,7 +92,7 @@ func LeakPendingVolumeCreate(t *testing.T, filename string) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -108,7 +109,7 @@ func LeakPendingVolumeCreate(t *testing.T, filename string) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify volumes, bricks, & pending ops exist
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))

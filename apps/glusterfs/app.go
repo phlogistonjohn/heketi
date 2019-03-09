@@ -26,6 +26,7 @@ import (
 	"github.com/heketi/heketi/executors/kubeexec"
 	"github.com/heketi/heketi/executors/mockexec"
 	"github.com/heketi/heketi/executors/sshexec"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/logging"
 	"github.com/heketi/heketi/server/rest"
 )
@@ -214,7 +215,7 @@ func (app *App) initDB() error {
 		}
 		app.dbReadOnly = true
 	} else {
-		err = app.db.Update(func(tx *bolt.Tx) error {
+		err = app.db.Update(func(tx *wdb.Tx) error {
 			err := initializeBuckets(tx)
 			if err != nil {
 				return logger.LogError("Unable to initialize buckets: %v", err)
@@ -710,7 +711,7 @@ func (a *App) Close() {
 }
 
 func (a *App) Backup(w http.ResponseWriter, r *http.Request) {
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="heketi.db"`)
 		w.Header().Set("Content-Length", strconv.Itoa(int(tx.Size())))
@@ -735,7 +736,7 @@ func (a *App) NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 func (a *App) ServerReset() error {
 	// currently this code just resets the operations in the db
 	// to stale
-	return a.db.Update(func(tx *bolt.Tx) error {
+	return a.db.Update(func(tx *wdb.Tx) error {
 		if err := MarkPendingOperationsStale(tx); err != nil {
 			logger.LogError("failed to mark operations stale: %v", err)
 			return err

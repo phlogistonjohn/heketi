@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
 	wdb "github.com/heketi/heketi/pkg/db"
@@ -229,7 +228,7 @@ func TestNodeHeathCacheSkipOffline(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// mark some nodes offline
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		nl, err := NodeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		for i, nodeId := range nl {
@@ -302,7 +301,7 @@ func TestNodeHeathCacheExpireNodes(t *testing.T) {
 	}
 
 	// mark some nodes offline
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		nl, err := NodeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		for i, nodeId := range nl {

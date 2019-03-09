@@ -13,10 +13,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/heketi/heketi/pkg/glusterfs/api"
-
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
 func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
@@ -46,7 +46,7 @@ func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
 
 		// we should now have one block volume with one bhv
 		var volId string
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vl, e := VolumeList(tx)
 			tests.Assert(t, e == nil, "expected e == nil, got", e)
 			tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -67,7 +67,7 @@ func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
 		app, volId := setup(t)
 		defer app.Close()
 
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			// first, we intentionally mess up the FreeSize
 			vol, e := NewVolumeEntryFromId(tx, volId)
 			tests.Assert(t, e == nil, "expected e == nil, got", e)
@@ -92,7 +92,7 @@ func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
 		app, volId := setup(t)
 		defer app.Close()
 
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			// we run the autocorrect func on entries that are already ok
 			e := fixIncorrectBlockHostingFreeSize(tx)
 			tests.Assert(t, e == nil, "expected e == nil, got", e)
@@ -110,7 +110,7 @@ func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
 		app, volId := setup(t)
 		defer app.Close()
 
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			// first, we intentionally mess up the FreeSize
 			vol, e := NewVolumeEntryFromId(tx, volId)
 			tests.Assert(t, e == nil, "expected e == nil, got", e)
@@ -142,7 +142,7 @@ func TestFixIncorrectBlockHostingFreeSize(t *testing.T) {
 		app, volId := setup(t)
 		defer app.Close()
 
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			// first, we intentionally mess up the FreeSize
 			vol, e := NewVolumeEntryFromId(tx, volId)
 			tests.Assert(t, e == nil, "expected e == nil, got", e)
@@ -193,7 +193,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 
 	// we should now have one block volume with one bhv
 	var vol *VolumeEntry
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -209,7 +209,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 	})
 
 	resetVol := func(rn api.BlockRestriction, f, r int) {
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.Restriction = rn
 			vol.Info.BlockInfo.FreeSize = f
 			vol.Info.BlockInfo.ReservedSize = r
@@ -218,14 +218,14 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 	}
 
 	resetBvol := func() {
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			bvol.Info.Size = req.Size
 			return bvol.Save(tx)
 		})
 	}
 
 	assertRestrictionIs := func(t *testing.T, r api.BlockRestriction) {
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			v, err := NewVolumeEntryFromId(tx, vol.Info.Id)
 			tests.Assert(t, err == nil, "expected err == nil, got", err)
 			tests.Assert(t, v.Info.BlockInfo.Restriction == r,
@@ -239,7 +239,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.Restriction,
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			err := fixBlockHostingReservedSize(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got", err)
 			return nil
@@ -250,7 +250,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.Restriction,
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.FreeSize += vol.Info.BlockInfo.ReservedSize
 			vol.Info.BlockInfo.ReservedSize = 0
 			err := vol.Save(tx)
@@ -267,7 +267,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.Restriction,
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.FreeSize = 0
 			vol.Info.BlockInfo.ReservedSize = 0
 			err := vol.Save(tx)
@@ -285,7 +285,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
 		defer resetBvol()
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.FreeSize += vol.Info.BlockInfo.ReservedSize
 			vol.Info.BlockInfo.ReservedSize = 0
 			vol.Info.BlockInfo.Restriction = api.LockedByUpdate
@@ -304,7 +304,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
 		defer resetBvol()
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.FreeSize = 0
 			vol.Info.BlockInfo.ReservedSize = 0
 			err := vol.Save(tx)
@@ -325,7 +325,7 @@ func TestFixBlockHostingReservedSize(t *testing.T) {
 			vol.Info.BlockInfo.FreeSize,
 			vol.Info.BlockInfo.ReservedSize)
 		defer resetBvol()
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.FreeSize = 50
 			vol.Info.BlockInfo.ReservedSize = -50
 			err := vol.Save(tx)

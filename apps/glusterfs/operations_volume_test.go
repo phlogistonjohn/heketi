@@ -17,9 +17,9 @@ import (
 	"testing"
 
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 )
 
@@ -48,7 +48,7 @@ func TestVolumeCreatePendingCreatedCleared(t *testing.T) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -65,7 +65,7 @@ func TestVolumeCreatePendingCreatedCleared(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify volumes, bricks, & pending ops exist
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -98,7 +98,7 @@ func TestVolumeCreatePendingCreatedCleared(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify volumes & bricks exist but pending is gone
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -150,7 +150,7 @@ func TestVolumeCreatePendingRollback(t *testing.T) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -167,7 +167,7 @@ func TestVolumeCreatePendingRollback(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify volumes, bricks, & pending ops exist
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -200,7 +200,7 @@ func TestVolumeCreatePendingRollback(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -239,7 +239,7 @@ func TestVolumeCreateRollbackCleanupFailure(t *testing.T) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -271,7 +271,7 @@ func TestVolumeCreateRollbackCleanupFailure(t *testing.T) {
 
 	// verify that the pending items remain in the db due to rollback
 	// failure
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -314,7 +314,7 @@ func TestVolumeCreatePendingNoSpace(t *testing.T) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -333,7 +333,7 @@ func TestVolumeCreatePendingNoSpace(t *testing.T) {
 		"expected strings.Contains(e.Error(), ErrNoSpace.Error()) got", e)
 
 	// verify no volumes, bricks or pending ops in db
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -372,7 +372,7 @@ func TestVolumeCreatePendingBrickMissing(t *testing.T) {
 	vc := NewVolumeCreateOperation(vol, app.db)
 
 	// verify that there are no volumes, bricks or pending operations
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 0, "expected len(vl) == 0, got", len(vl))
@@ -389,7 +389,7 @@ func TestVolumeCreatePendingBrickMissing(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// verify volumes, bricks, & pending ops exist
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got", len(vl))
@@ -415,7 +415,7 @@ func TestVolumeCreatePendingBrickMissing(t *testing.T) {
 		return nil
 	})
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		b, e := NewBrickEntryFromId(tx, bl[0])
@@ -520,7 +520,7 @@ func TestVolumeCreateOperationRetrying(t *testing.T) {
 	}
 	tests.Assert(t, x >= 9, "expected x >= 10, got:", x)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -571,7 +571,7 @@ func TestVolumeDeleteOperation(t *testing.T) {
 	e = vc.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -585,7 +585,7 @@ func TestVolumeDeleteOperation(t *testing.T) {
 	e = vd.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -600,7 +600,7 @@ func TestVolumeDeleteOperation(t *testing.T) {
 	e = vd.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 0, "expected len(bl) == 0, got:", len(bl))
@@ -643,7 +643,7 @@ func TestVolumeDeleteOperationRollback(t *testing.T) {
 	e = vc.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -657,7 +657,7 @@ func TestVolumeDeleteOperationRollback(t *testing.T) {
 	e = vd.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -670,7 +670,7 @@ func TestVolumeDeleteOperationRollback(t *testing.T) {
 	e = vd.Rollback(app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vl, e := VolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(vl) == 1, "expected len(vl) == 1, got:", len(vl))
@@ -716,7 +716,7 @@ func TestVolumeDeleteOperationTwice(t *testing.T) {
 	e = vc.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -730,7 +730,7 @@ func TestVolumeDeleteOperationTwice(t *testing.T) {
 	e = vd.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		po, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(po) == 1, "expected len(po) == 1, got:", len(po))
@@ -779,7 +779,7 @@ func TestVolumeDeleteOperationDuringExpand(t *testing.T) {
 	e = vc.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -793,7 +793,7 @@ func TestVolumeDeleteOperationDuringExpand(t *testing.T) {
 	e = ve.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		po, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(po) == 1, "expected len(po) == 1, got:", len(po))
@@ -837,7 +837,7 @@ func TestVolumeExpandOperation(t *testing.T) {
 	e = vc.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 3, "expected len(bl) == 3, got:", len(bl))
@@ -851,7 +851,7 @@ func TestVolumeExpandOperation(t *testing.T) {
 	e = ve.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 6, "expected len(bl) == 6, got:", len(bl))
@@ -876,7 +876,7 @@ func TestVolumeExpandOperation(t *testing.T) {
 	e = ve.Finalize()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, e := BrickList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bl) == 6, "expected len(bl) == 6, got:", len(bl))
@@ -923,7 +923,7 @@ func TestListCompleteVolumesDuringOperation(t *testing.T) {
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 		defer o.Rollback(app.executor)
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := ListCompleteVolumes(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 0,
@@ -945,7 +945,7 @@ func TestListCompleteVolumesDuringOperation(t *testing.T) {
 		e := RunOperation(vco, app.executor)
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := ListCompleteVolumes(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 1,
@@ -967,7 +967,7 @@ func TestListCompleteVolumesDuringOperation(t *testing.T) {
 			tests.Assert(t, e == nil, "expected e == nil, got:", e)
 		}()
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := ListCompleteVolumes(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 0,
@@ -988,7 +988,7 @@ func TestListCompleteVolumesDuringOperation(t *testing.T) {
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 		defer bvco.Rollback(app.executor)
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := ListCompleteVolumes(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 0,

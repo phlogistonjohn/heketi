@@ -14,9 +14,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
@@ -44,7 +44,7 @@ func TestClusterDeviceSource(t *testing.T) {
 		return dsrc
 	}
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		cids, err := ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(cids) == 2,
@@ -85,7 +85,7 @@ func TestClusterDeviceSourcePartial(t *testing.T) {
 
 	// mark a device and a node as offline
 	var clusterId string
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		cids, err := ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(cids) == 2,
@@ -112,7 +112,7 @@ func TestClusterDeviceSourcePartial(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		dsrc := NewClusterDeviceSource(tx, clusterId)
 		// test that it pulls all devices in the cluster
 		devices, err := dsrc.Devices()
@@ -139,7 +139,7 @@ func TestClusterDeviceSourceLookupEmptyCache(t *testing.T) {
 	)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		cids, err := ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(cids) == 1,
@@ -209,7 +209,7 @@ func TestClusterDeviceSourceAlloc(t *testing.T) {
 	)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		cids, err := ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(cids) == 2,

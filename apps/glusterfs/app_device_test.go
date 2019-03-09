@@ -18,15 +18,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+	"github.com/heketi/tests"
+
 	client "github.com/heketi/heketi/client/api/go-client"
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func TestDeviceAddBadRequests(t *testing.T) {
@@ -111,7 +112,7 @@ func TestDeviceAddDelete(t *testing.T) {
 	cluster.NodeAdd(node.Info.Id)
 
 	// Save information in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		err := cluster.Save(tx)
 		if err != nil {
 			return err
@@ -179,7 +180,7 @@ func TestDeviceAddDelete(t *testing.T) {
 
 	// Check db to make sure devices where added
 	devicemap := make(map[string]*DeviceEntry)
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		node, err = NewNodeEntryFromId(tx, node.Info.Id)
 		if err != nil {
 			return err
@@ -209,7 +210,7 @@ func TestDeviceAddDelete(t *testing.T) {
 
 	// Add some bricks to check if delete conflicts works
 	fakeid := devicemap["/dev/fake1"].Info.Id
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, fakeid)
 		if err != nil {
 			return err
@@ -228,7 +229,7 @@ func TestDeviceAddDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 	tests.Assert(t, r.StatusCode == http.StatusBadRequest)
 
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, fakeid)
 		if err != nil {
 			return err
@@ -245,7 +246,7 @@ func TestDeviceAddDelete(t *testing.T) {
 	tests.Assert(t, r.StatusCode == http.StatusConflict)
 	tests.Assert(t, utils.GetErrorFromResponse(r).Error() == devicemap["/dev/fake1"].ConflictString())
 	// Check the db is still intact
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, fakeid)
 		if err != nil {
 			return err
@@ -262,7 +263,7 @@ func TestDeviceAddDelete(t *testing.T) {
 	tests.Assert(t, sortedstrings.Has(node.Devices, fakeid))
 
 	// Node delete bricks from the device
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, fakeid)
 		if err != nil {
 			return err
@@ -365,14 +366,14 @@ func TestDeviceAddDelete(t *testing.T) {
 	}
 
 	// Check db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewDeviceEntryFromId(tx, fakeid)
 		return err
 	})
 	tests.Assert(t, err == ErrNotFound)
 
 	// Check node does not have the device
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		node, err = NewNodeEntryFromId(tx, node.Info.Id)
 		return err
 	})
@@ -440,7 +441,7 @@ func TestDeviceAddCleansUp(t *testing.T) {
 	cluster.NodeAdd(node.Info.Id)
 
 	// Save information in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		err := cluster.Save(tx)
 		if err != nil {
 			return err
@@ -556,7 +557,7 @@ func TestDeviceInfo(t *testing.T) {
 	device.StorageAllocate(1000)
 
 	// Save device in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return device.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -601,7 +602,7 @@ func TestDeviceDeleteErrors(t *testing.T) {
 	device.StorageAllocate(1000)
 
 	// Save device in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return device.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -809,7 +810,7 @@ func TestDeviceSync(t *testing.T) {
 	var free uint64 = 350 * 1024 * 1024
 
 	// Init test database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		cluster := NewClusterEntry()
 		cluster.Info.Id = idgen.GenUUID()
 		if err := cluster.Save(tx); err != nil {
@@ -872,7 +873,7 @@ func TestDeviceSync(t *testing.T) {
 		}
 	}
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, deviceId)
 		tests.Assert(t, err == nil)
 		tests.Assert(t, device.Info.Storage.Total == total, "expected:", total, "got:", device.Info.Storage.Total)
@@ -1003,7 +1004,7 @@ func TestDeviceSetTags(t *testing.T) {
 	device.NodeId = "def"
 	device.StorageSet(10000, 10000, 0)
 	device.StorageAllocate(1000)
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return device.Save(tx)
 	})
 	tests.Assert(t, err == nil)

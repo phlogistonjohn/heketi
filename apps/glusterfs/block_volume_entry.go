@@ -14,13 +14,13 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 type BlockVolumeEntry struct {
@@ -28,7 +28,7 @@ type BlockVolumeEntry struct {
 	Pending PendingItem
 }
 
-func BlockVolumeList(tx *bolt.Tx) ([]string, error) {
+func BlockVolumeList(tx *wdb.Tx) ([]string, error) {
 	list := EntryKeys(tx, BOLTDB_BUCKET_BLOCKVOLUME)
 	if list == nil {
 		return nil, ErrAccessList
@@ -87,7 +87,7 @@ func NewBlockVolumeEntryFromRequest(req *api.BlockVolumeCreateRequest) *BlockVol
 	return vol
 }
 
-func NewBlockVolumeEntryFromId(tx *bolt.Tx, id string) (*BlockVolumeEntry, error) {
+func NewBlockVolumeEntryFromId(tx *wdb.Tx, id string) (*BlockVolumeEntry, error) {
 	godbc.Require(tx != nil)
 
 	entry := NewBlockVolumeEntry()
@@ -107,18 +107,18 @@ func (v *BlockVolumeEntry) Visible() bool {
 	return v.Pending.Id == ""
 }
 
-func (v *BlockVolumeEntry) Save(tx *bolt.Tx) error {
+func (v *BlockVolumeEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(v.Info.Id) > 0)
 
 	return EntrySave(tx, v, v.Info.Id)
 }
 
-func (v *BlockVolumeEntry) Delete(tx *bolt.Tx) error {
+func (v *BlockVolumeEntry) Delete(tx *wdb.Tx) error {
 	return EntryDelete(tx, v, v.Info.Id)
 }
 
-func (v *BlockVolumeEntry) NewInfoResponse(tx *bolt.Tx) (*api.BlockVolumeInfoResponse, error) {
+func (v *BlockVolumeEntry) NewInfoResponse(tx *wdb.Tx) (*api.BlockVolumeInfoResponse, error) {
 	godbc.Require(tx != nil)
 
 	info := api.NewBlockVolumeInfoResponse()
@@ -155,7 +155,7 @@ func (v *BlockVolumeEntry) eligibleClustersAndVolumes(db wdb.RODB) (
 	possibleClusters []string, volumes []*VolumeEntry, e error) {
 
 	if len(v.Info.Clusters) == 0 {
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			var err error
 			possibleClusters, err = ClusterList(tx)
 			return err
@@ -178,7 +178,7 @@ func (v *BlockVolumeEntry) eligibleClustersAndVolumes(db wdb.RODB) (
 
 	var possibleVolumes []string
 	for _, clusterId := range possibleClusters {
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			var err error
 			c, err := NewClusterEntryFromId(tx, clusterId)
 			for _, vol := range c.Info.Volumes {
@@ -201,7 +201,7 @@ func (v *BlockVolumeEntry) eligibleClustersAndVolumes(db wdb.RODB) (
 	logger.Debug("Using the following possible block hosting volumes: %+v", possibleVolumes)
 
 	for _, vol := range possibleVolumes {
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			volEntry, err := NewVolumeEntryFromId(tx, vol)
 			if err != nil {
 				return err
@@ -237,7 +237,7 @@ func (v *BlockVolumeEntry) Create(db wdb.DB,
 }
 
 func (v *BlockVolumeEntry) saveNewEntry(db wdb.DB) error {
-	return db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *wdb.Tx) error {
 
 		err := v.Save(tx)
 		if err != nil {
@@ -278,7 +278,7 @@ func (v *BlockVolumeEntry) saveNewEntry(db wdb.DB) error {
 }
 
 func (v *BlockVolumeEntry) blockHostingVolumeName(db wdb.RODB) (name string, e error) {
-	e = db.View(func(tx *bolt.Tx) error {
+	e = db.View(func(tx *wdb.Tx) error {
 		volume, err := NewVolumeEntryFromId(tx, v.Info.BlockHostingVolume)
 		if err != nil {
 			logger.LogError("Unable to load block hosting volume: %v", err)
@@ -321,7 +321,7 @@ func (v *BlockVolumeEntry) destroyFromHost(
 }
 
 func (v *BlockVolumeEntry) removeComponents(db wdb.DB, keepSize bool) error {
-	return db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *wdb.Tx) error {
 		// Remove volume from cluster
 		cluster, err := NewClusterEntryFromId(tx, v.Info.Cluster)
 		if err != nil {
@@ -376,7 +376,7 @@ func (v *BlockVolumeEntry) Destroy(db wdb.DB, executor executors.Executor) error
 // can host the incoming block volume. It returns false (and nil error) if
 // the volume is incompatible. It returns false, and an error if the
 // database operation fails.
-func canHostBlockVolume(tx *bolt.Tx, bv *BlockVolumeEntry, vol *VolumeEntry) (bool, error) {
+func canHostBlockVolume(tx *wdb.Tx, bv *BlockVolumeEntry, vol *VolumeEntry) (bool, error) {
 	if vol.Info.BlockInfo.Restriction != api.Unrestricted {
 		logger.Warning("Block hosting volume %v usage is restricted: %v",
 			vol.Info.Id, vol.Info.BlockInfo.Restriction)
@@ -411,7 +411,7 @@ func (v *BlockVolumeEntry) updateHosts(hosts []string) {
 // for running commands related to this block volume
 func (v *BlockVolumeEntry) hosts(db wdb.RODB) (nodeHosts, error) {
 	var hosts nodeHosts
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		cluster, err := NewClusterEntryFromId(tx, v.Info.Cluster)
 		if err != nil {
 			return err
@@ -424,7 +424,7 @@ func (v *BlockVolumeEntry) hosts(db wdb.RODB) (nodeHosts, error) {
 
 // hasPendingBlockHostingVolume returns true if the db contains pending
 // block hosting volumes.
-func hasPendingBlockHostingVolume(tx *bolt.Tx) (bool, error) {
+func hasPendingBlockHostingVolume(tx *wdb.Tx) (bool, error) {
 	pmap, err := MapPendingVolumes(tx)
 	if err != nil {
 		return false, err

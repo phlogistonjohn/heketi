@@ -13,10 +13,10 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-	"github.com/lpabon/godbc"
 )
 
 // Creates a block volume
@@ -56,7 +56,7 @@ func (v *BlockVolumeEntry) createBlockVolumeRequest(db wdb.RODB,
 
 	var blockHostingVolumeName string
 
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		logger.Debug("Getting info for block hosting volume %v", blockHostingVolumeId)
 		bhvol, err := NewVolumeEntryFromId(tx, blockHostingVolumeId)
 		if err != nil {

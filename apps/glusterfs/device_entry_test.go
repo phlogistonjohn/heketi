@@ -17,11 +17,13 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
+	"github.com/heketi/tests"
+
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/heketi/tests"
 )
 
 func createSampleDeviceEntry(nodeid string, disksize uint64) *DeviceEntry {
@@ -171,7 +173,7 @@ func TestNewDeviceEntryFromIdNotFound(t *testing.T) {
 	defer app.Close()
 
 	// Test for ID not found
-	err := app.db.View(func(tx *bolt.Tx) error {
+	err := app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewDeviceEntryFromId(tx, "123")
 		return err
 	})
@@ -200,13 +202,13 @@ func TestNewDeviceEntryFromId(t *testing.T) {
 	d.BrickAdd("def")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return d.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var device *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
@@ -240,13 +242,13 @@ func TestNewDeviceEntrySaveDelete(t *testing.T) {
 	d.BrickAdd("def")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return d.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var device *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
@@ -259,7 +261,7 @@ func TestNewDeviceEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, reflect.DeepEqual(device, d))
 
 	// Delete device which has bricks
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
@@ -280,7 +282,7 @@ func TestNewDeviceEntrySaveDelete(t *testing.T) {
 	device.BrickDelete("abc")
 	device.BrickDelete("def")
 	tests.Assert(t, len(device.Bricks) == 0)
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return device.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -296,7 +298,7 @@ func TestNewDeviceEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil, err)
 
 	// Now try to delete the device
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
@@ -314,7 +316,7 @@ func TestNewDeviceEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check device has been deleted and is not in db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
@@ -348,12 +350,12 @@ func TestNewDeviceEntryNewInfoResponseBadBrickIds(t *testing.T) {
 	d.BrickAdd("def")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return d.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
 			return err
@@ -400,7 +402,7 @@ func TestNewDeviceEntryNewInfoResponse(t *testing.T) {
 	d.BrickAdd("bbb")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		err := d.Save(tx)
 		if err != nil {
 			return err
@@ -411,7 +413,7 @@ func TestNewDeviceEntryNewInfoResponse(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	var info *api.DeviceInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		device, err := NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
 			return err
@@ -508,7 +510,7 @@ func TestDeviceSetStateFailed(t *testing.T) {
 	n.DeviceAdd(d.Info.Id)
 
 	// Save in db
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil)
 
@@ -584,7 +586,7 @@ func TestDeviceSetStateOfflineOnline(t *testing.T) {
 	n.DeviceAdd(d.Info.Id)
 
 	// Save in db
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil)
 
@@ -641,7 +643,7 @@ func TestDeviceSetStateFailedWithBricks(t *testing.T) {
 
 	// grab a device that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -665,7 +667,7 @@ func TestDeviceSetStateFailedWithBricks(t *testing.T) {
 	tests.Assert(t, d.State == api.EntryStateOffline)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -685,7 +687,7 @@ func TestDeviceSetStateFailedWithBricks(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -723,7 +725,7 @@ func TestDeviceSetStateFailedTooFewDevices(t *testing.T) {
 
 	// grab a device that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -747,7 +749,7 @@ func TestDeviceSetStateFailedTooFewDevices(t *testing.T) {
 	tests.Assert(t, d.State == api.EntryStateOffline)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -772,7 +774,7 @@ func TestDeviceSetStateFailedTooFewDevices(t *testing.T) {
 func mockVolumeInfoFromDb(db *bolt.DB, volume string) (*executors.Volume, error) {
 	volume = volume[4:]
 	vi := &executors.Volume{}
-	db.View(func(tx *bolt.Tx) error {
+	db.View(func(tx *wdb.Tx) error {
 		bl, _ := BrickList(tx)
 		for _, id := range bl {
 			b, err := NewBrickEntryFromId(tx, id)
@@ -798,7 +800,7 @@ func mockVolumeInfoFromDb(db *bolt.DB, volume string) (*executors.Volume, error)
 func mockHealStatusFromDb(db *bolt.DB, volume string) (*executors.HealInfo, error) {
 	hi := &executors.HealInfo{}
 	volume = volume[4:]
-	db.View(func(tx *bolt.Tx) error {
+	db.View(func(tx *wdb.Tx) error {
 		bl, _ := BrickList(tx)
 		for _, id := range bl {
 			b, err := NewBrickEntryFromId(tx, id)
@@ -852,7 +854,7 @@ func TestDeviceSetStateFailedWithEmptyPathBricks(t *testing.T) {
 	// and a brick to create copy of it
 	var d *DeviceEntry
 	var newbrick *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -876,7 +878,7 @@ func TestDeviceSetStateFailedWithEmptyPathBricks(t *testing.T) {
 	newbrick = d.NewBrickEntry(102400, 1, 2000, idgen.GenUUID())
 	newbrick.Info.Path = ""
 	d.BrickAdd(newbrick.Id())
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err = d.Save(tx)
 		tests.Assert(t, err == nil)
 		return newbrick.Save(tx)
@@ -888,7 +890,7 @@ func TestDeviceSetStateFailedWithEmptyPathBricks(t *testing.T) {
 	tests.Assert(t, d.State == api.EntryStateOffline)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -910,7 +912,7 @@ func TestDeviceSetStateFailedWithEmptyPathBricks(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -959,7 +961,7 @@ func testDeviceRemoveSizeAccounting(t *testing.T, useArbiter bool) {
 	// grab a device that has bricks
 	var d *DeviceEntry
 	vols := []string{}
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -988,7 +990,7 @@ func testDeviceRemoveSizeAccounting(t *testing.T, useArbiter bool) {
 	tests.Assert(t, d.State == api.EntryStateOffline)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -1008,7 +1010,7 @@ func testDeviceRemoveSizeAccounting(t *testing.T, useArbiter bool) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -1024,7 +1026,7 @@ func testDeviceRemoveSizeAccounting(t *testing.T, useArbiter bool) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -1033,7 +1035,7 @@ func testDeviceRemoveSizeAccounting(t *testing.T, useArbiter bool) {
 	tests.Assert(t, d.Info.Storage.Used == 0,
 		"expected d.Info.Storage.Used == 0, got:", d.Info.Storage.Used)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		for _, vid := range vols {
 			v, err := NewVolumeEntryFromId(tx, vid)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
@@ -1066,21 +1068,21 @@ func TestDbEntryLoadUnmarshalError(t *testing.T) {
 	c.Info.Id = idgen.GenUUID()
 	c.Info.Block = true
 	c.Info.File = true
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		return nil
 	})
 
 	// works in the normal case
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		err := EntryLoad(tx, c, c.Info.Id)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		return nil
 	})
 
 	// mess up the value
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(c.BucketName()))
 		tests.Assert(t, b != nil, "expected b != nil")
 		err := b.Put([]byte(c.Info.Id), []byte("bob"))
@@ -1089,7 +1091,7 @@ func TestDbEntryLoadUnmarshalError(t *testing.T) {
 	})
 
 	// fails with a "malformed" value
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		err := EntryLoad(tx, c, c.Info.Id)
 		tests.Assert(t, err != nil, "expected err != nil, got:", err)
 		// assert that the error indicates the bucket and key that failed

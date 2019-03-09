@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
+
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
@@ -31,7 +32,7 @@ func dbDumpInternal(db wdb.DB) (Db, error) {
 	dbattributeEntryList := make(map[string]DbAttributeEntry, 0)
 	pendingOpEntryList := make(map[string]PendingOperationEntry, 0)
 
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 
 		logger.Debug("volume bucket")
 
@@ -274,7 +275,7 @@ func DbCreate(jsonfile string, dbfile string) error {
 	}
 	defer dbhandle.Close()
 
-	err = dbhandle.Update(func(tx *bolt.Tx) error {
+	err = dbhandle.Update(func(tx *wdb.Tx) error {
 		return initializeBuckets(tx)
 	})
 	if err != nil {
@@ -282,7 +283,7 @@ func DbCreate(jsonfile string, dbfile string) error {
 		return nil
 	}
 
-	err = dbhandle.Update(func(tx *bolt.Tx) error {
+	err = dbhandle.Update(func(tx *wdb.Tx) error {
 		for _, cluster := range dump.Clusters {
 			logger.Debug("adding cluster entry %v", cluster.Info.Id)
 			err := cluster.Save(tx)
@@ -392,7 +393,7 @@ func DeleteBricksWithEmptyPath(db wdb.DB, all bool, clusterIDs []string, nodeIDs
 		}
 	}
 
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *wdb.Tx) error {
 		if true == all {
 			logger.Debug("deleting all bricks with empty path")
 			clusters, err := ClusterList(tx)

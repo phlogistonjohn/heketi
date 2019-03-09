@@ -15,9 +15,9 @@ import (
 	"testing"
 
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 )
 
@@ -39,7 +39,7 @@ func TestDeviceRemoveOperationEmpty(t *testing.T) {
 
 	// grab a device
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -64,7 +64,7 @@ func TestDeviceRemoveOperationEmpty(t *testing.T) {
 
 	// because there are no bricks on this device it can be disabled
 	// instantly and there are no pending ops for it in the db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -107,7 +107,7 @@ func TestDeviceRemoveOperationWithBricks(t *testing.T) {
 
 	// grab a devices that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ func TestDeviceRemoveOperationWithBricks(t *testing.T) {
 
 	// because there were bricks on this device it needs to perform
 	// a full "operation cycle"
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -153,7 +153,7 @@ func TestDeviceRemoveOperationWithBricks(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// operation is not over. we should still have a pending op
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -164,7 +164,7 @@ func TestDeviceRemoveOperationWithBricks(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// operation is over. we should _not_ have a pending op now
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -172,7 +172,7 @@ func TestDeviceRemoveOperationWithBricks(t *testing.T) {
 	})
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -212,7 +212,7 @@ func TestDeviceRemoveOperationTooFewDevices(t *testing.T) {
 
 	// grab a devices that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -240,7 +240,7 @@ func TestDeviceRemoveOperationTooFewDevices(t *testing.T) {
 
 	// because there were bricks on this device it needs to perform
 	// a full "operation cycle"
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -260,7 +260,7 @@ func TestDeviceRemoveOperationTooFewDevices(t *testing.T) {
 		err.Error())
 
 	// operation is not over. we should still have a pending op
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -271,7 +271,7 @@ func TestDeviceRemoveOperationTooFewDevices(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	// operation is over. we should _not_ have a pending op now
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -279,7 +279,7 @@ func TestDeviceRemoveOperationTooFewDevices(t *testing.T) {
 	})
 
 	// update d from db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -319,7 +319,7 @@ func TestDeviceRemoveOperationOtherPendingOps(t *testing.T) {
 
 	// grab a devices that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -344,7 +344,7 @@ func TestDeviceRemoveOperationOtherPendingOps(t *testing.T) {
 	err = vc.Build()
 	tests.Assert(t, err == nil, "expected e == nil, got", err)
 	// we should have one pending operation
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -359,7 +359,7 @@ func TestDeviceRemoveOperationOtherPendingOps(t *testing.T) {
 	tests.Assert(t, err == ErrConflict, "expected err == ErrConflict, got:", err)
 
 	// we should have one pending operation (the volume create)
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -398,7 +398,7 @@ func TestDeviceRemoveOperationMultipleRequests(t *testing.T) {
 
 	// grab a device that has bricks
 	var d *DeviceEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -434,7 +434,7 @@ func TestDeviceRemoveOperationMultipleRequests(t *testing.T) {
 	tests.Assert(t, err == ErrConflict, "expected err == ErrConflict, got:", err)
 
 	// we should have one pending operation (the device remove)
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))

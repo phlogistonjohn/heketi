@@ -14,9 +14,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/boltdb/bolt"
-	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
 func createSampleBlockVolumeEntry(size int) *BlockVolumeEntry {
@@ -136,7 +137,7 @@ func TestBlockVolumeEntryFromIdNotFound(t *testing.T) {
 	defer app.Close()
 
 	// Test for ID not found
-	err := app.db.View(func(tx *bolt.Tx) error {
+	err := app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewBlockVolumeEntryFromId(tx, "123")
 		return err
 	})
@@ -156,14 +157,14 @@ func TestBlockVolumeEntryFromId(t *testing.T) {
 	bv := createSampleBlockVolumeEntry(1024)
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return bv.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Load from database
 	var entry *BlockVolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewBlockVolumeEntryFromId(tx, bv.Info.Id)
 		return err
@@ -185,14 +186,14 @@ func TestBlockVolumeEntrySaveDelete(t *testing.T) {
 	bv := createSampleBlockVolumeEntry(1024)
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return bv.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Delete entry which has devices
 	var entry *BlockVolumeEntry
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewBlockVolumeEntryFromId(tx, bv.Info.Id)
 		if err != nil {
@@ -210,7 +211,7 @@ func TestBlockVolumeEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check volume has been deleted and is not in db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewBlockVolumeEntryFromId(tx, bv.Info.Id)
 		if err != nil {
@@ -234,14 +235,14 @@ func TestNewBlockVolumeEntryNewInfoResponse(t *testing.T) {
 	bv := createSampleBlockVolumeEntry(1024)
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return bv.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Retrieve info response
 	var info *api.BlockVolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		volume, err := NewBlockVolumeEntryFromId(tx, bv.Info.Id)
 		if err != nil {
 			return err
@@ -276,7 +277,7 @@ func TestBlockVolumeEntryCreateMissingCluster(t *testing.T) {
 	bv.Info.Clusters = []string{}
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return bv.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -316,7 +317,7 @@ func TestBlockVolumeEntryDestroy(t *testing.T) {
 
 	// Destroy the block hosting volume
 	var vol *VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		vol, err = NewVolumeEntryFromId(tx, bv.Info.BlockHostingVolume)
 		tests.Assert(t, err == nil)
@@ -331,7 +332,7 @@ func TestBlockVolumeEntryDestroy(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check database volume does not exist
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		// Check that all devices have no used data
 		devices, err := DeviceList(tx)
@@ -354,7 +355,7 @@ func TestBlockVolumeEntryDestroy(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check that the devices have no bricks
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		devices, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -373,7 +374,7 @@ func TestBlockVolumeEntryDestroy(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check that the cluster has no volumes
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		clusters, err := ClusterList(tx)
 		if err != nil {
 			return err

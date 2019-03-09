@@ -27,12 +27,14 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+	"github.com/heketi/tests"
+
 	client "github.com/heketi/heketi/client/api/go-client"
 	"github.com/heketi/heketi/pkg/db"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/sortedstrings"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func TestVolumeCreateBadGid(t *testing.T) {
@@ -711,7 +713,7 @@ func TestVolumeList(t *testing.T) {
 
 	// Create some volumes
 	numvolumes := 1000
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 
 		for i := 0; i < numvolumes; i++ {
 			v := createSampleReplicaVolumeEntry(100, 2)
@@ -739,7 +741,7 @@ func TestVolumeList(t *testing.T) {
 	tests.Assert(t, len(msg.Volumes) == numvolumes)
 
 	// Check that all the volumes are in the database
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, id := range msg.Volumes {
 			_, err := NewVolumeEntryFromId(tx, id)
 			if err != nil {
@@ -762,7 +764,7 @@ func TestVolumeListReadOnlyDb(t *testing.T) {
 
 	// Create some volumes
 	numvolumes := 1000
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 
 		for i := 0; i < numvolumes; i++ {
 			v := createSampleReplicaVolumeEntry(100, 2)
@@ -808,7 +810,7 @@ func TestVolumeListReadOnlyDb(t *testing.T) {
 	tests.Assert(t, len(msg.Volumes) == numvolumes)
 
 	// Check that all the volumes are in the database
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, id := range msg.Volumes {
 			_, err := NewVolumeEntryFromId(tx, id)
 			if err != nil {

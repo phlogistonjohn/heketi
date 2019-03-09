@@ -13,8 +13,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
@@ -68,7 +68,7 @@ func (a *App) NodeAdd(w http.ResponseWriter, r *http.Request) {
 	// Get cluster and peer node hostname
 	var cluster *ClusterEntry
 	var peer_node_hostname string
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, msg.ClusterId)
 		if err == ErrNotFound {
@@ -118,7 +118,7 @@ func (a *App) NodeAdd(w http.ResponseWriter, r *http.Request) {
 		// Cleanup in case of failure
 		defer func() {
 			if e != nil {
-				a.db.Update(func(tx *bolt.Tx) error {
+				a.db.Update(func(tx *wdb.Tx) error {
 					node.Deregister(tx)
 					return nil
 				})
@@ -136,7 +136,7 @@ func (a *App) NodeAdd(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Add node entry into the db
-		err = a.db.Update(func(tx *bolt.Tx) error {
+		err = a.db.Update(func(tx *wdb.Tx) error {
 			cluster, err := NewClusterEntryFromId(tx, msg.ClusterId)
 			if err == ErrNotFound {
 				http.Error(w, "Cluster id does not exist", http.StatusNotFound)
@@ -182,7 +182,7 @@ func (a *App) NodeInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Get Node information
 	var info *api.NodeInfoResponse
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewNodeEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)
@@ -223,7 +223,7 @@ func (a *App) NodeDelete(w http.ResponseWriter, r *http.Request) {
 		peer_node, node *NodeEntry
 		cluster         *ClusterEntry
 	)
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 
 		// Access node entry
 		var err error
@@ -289,7 +289,7 @@ func (a *App) NodeDelete(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Remove from db
-		err = a.db.Update(func(tx *bolt.Tx) error {
+		err = a.db.Update(func(tx *wdb.Tx) error {
 			// Get Cluster
 			cluster, err := NewClusterEntryFromId(tx, node.Info.ClusterId)
 			if err == ErrNotFound {
@@ -339,7 +339,7 @@ func (a *App) NodeDelete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func refreshVolumeNodes(tx *bolt.Tx, node *NodeEntry) error {
+func refreshVolumeNodes(tx *wdb.Tx, node *NodeEntry) error {
 	clusterID := node.Info.ClusterId
 	deletedNodeHostName := node.StorageHostName()
 	txdb := wdb.WrapTx(tx)
@@ -411,7 +411,7 @@ func (a *App) NodeSetState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check state is supported
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 		node, err = NewNodeEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)
@@ -479,7 +479,7 @@ func (a *App) NodeSetTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		node, err = NewNodeEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)

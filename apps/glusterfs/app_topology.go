@@ -10,7 +10,7 @@
 package glusterfs
 
 import (
-	"github.com/boltdb/bolt"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
@@ -19,7 +19,7 @@ func (a *App) TopologyInfo() (*api.TopologyInfoResponse, error) {
 		ClusterList: make([]api.Cluster, 0),
 	}
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		clusters, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -71,7 +71,7 @@ func (a *App) TopologyInfo() (*api.TopologyInfoResponse, error) {
 	return topo, err
 }
 
-func clusterInfo(tx *bolt.Tx, id string) (*api.ClusterInfoResponse, error) {
+func clusterInfo(tx *wdb.Tx, id string) (*api.ClusterInfoResponse, error) {
 	var info *api.ClusterInfoResponse
 	entry, err := NewClusterEntryFromId(tx, id)
 	if err != nil {
@@ -88,7 +88,7 @@ func clusterInfo(tx *bolt.Tx, id string) (*api.ClusterInfoResponse, error) {
 	return info, err
 }
 
-func volumeInfo(tx *bolt.Tx, id string) (*api.VolumeInfoResponse, error) {
+func volumeInfo(tx *wdb.Tx, id string) (*api.VolumeInfoResponse, error) {
 	var info *api.VolumeInfoResponse
 
 	entry, err := NewVolumeEntryFromId(tx, id)
@@ -101,7 +101,7 @@ func volumeInfo(tx *bolt.Tx, id string) (*api.VolumeInfoResponse, error) {
 	return info, err
 }
 
-func blockVolumeInfo(tx *bolt.Tx, id string) (*api.BlockVolumeInfoResponse, error) {
+func blockVolumeInfo(tx *wdb.Tx, id string) (*api.BlockVolumeInfoResponse, error) {
 	var info *api.BlockVolumeInfoResponse
 
 	entry, err := NewBlockVolumeEntryFromId(tx, id)
@@ -114,7 +114,7 @@ func blockVolumeInfo(tx *bolt.Tx, id string) (*api.BlockVolumeInfoResponse, erro
 	return info, err
 }
 
-func nodeInfo(tx *bolt.Tx, id string) (*api.NodeInfoResponse, error) {
+func nodeInfo(tx *wdb.Tx, id string) (*api.NodeInfoResponse, error) {
 	var info *api.NodeInfoResponse
 
 	entry, err := NewNodeEntryFromId(tx, id)

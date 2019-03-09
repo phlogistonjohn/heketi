@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
@@ -47,7 +47,7 @@ func TestBasicOperationsCleanup(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -65,7 +65,7 @@ func TestBasicOperationsCleanup(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// assert that pending volume create got cleaned up
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -100,7 +100,7 @@ func TestOperationsCleanupThreeOps(t *testing.T) {
 	e := RunOperation(vc, app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -125,7 +125,7 @@ func TestOperationsCleanupThreeOps(t *testing.T) {
 	e = vdel.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 3, "expected len(l) == 3, got:", len(l))
@@ -142,7 +142,7 @@ func TestOperationsCleanupThreeOps(t *testing.T) {
 	e = oc.Clean()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -179,7 +179,7 @@ func TestOperationsCleanupSkipNonLoadable(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	var deviceId string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -201,7 +201,7 @@ func TestOperationsCleanupSkipNonLoadable(t *testing.T) {
 	e = dro.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -219,7 +219,7 @@ func TestOperationsCleanupSkipNonLoadable(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// the non cleanable device remove operation remains
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -254,7 +254,7 @@ func TestOperationsCleanupVolumeExpand(t *testing.T) {
 	e := RunOperation(vc, app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -265,7 +265,7 @@ func TestOperationsCleanupVolumeExpand(t *testing.T) {
 	e = ve.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		po, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(po) == 1, "expected len(po) == 1, got:", len(po))
@@ -282,7 +282,7 @@ func TestOperationsCleanupVolumeExpand(t *testing.T) {
 	e = oc.Clean()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -321,7 +321,7 @@ func TestOperationsCleanupBlockVolumeCreate(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -338,7 +338,7 @@ func TestOperationsCleanupBlockVolumeCreate(t *testing.T) {
 	e = oc.Clean()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -374,7 +374,7 @@ func TestOperationsCleanupBlockVolumeDelete(t *testing.T) {
 	e = vdel.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -391,7 +391,7 @@ func TestOperationsCleanupBlockVolumeDelete(t *testing.T) {
 	e = oc.Clean()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -425,7 +425,7 @@ func TestOperationsCleanupCleanFail(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -449,7 +449,7 @@ func TestOperationsCleanupCleanFail(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// the pending op should remain because the Clean failed
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -483,7 +483,7 @@ func TestOperationsCleanupBrokenOp(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -523,7 +523,7 @@ func TestOperationsCleanupBrokenOp(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// the pending op should remain because the Clean failed
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -563,7 +563,7 @@ func TestOperationCleanerMarkStale(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -586,7 +586,7 @@ func TestOperationCleanerMarkStale(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// we ran the mark function, but time had not advanced. no changes
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -602,7 +602,7 @@ func TestOperationCleanerMarkStale(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// we ran the mark function, but time had not gone far. no changes
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -618,7 +618,7 @@ func TestOperationCleanerMarkStale(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// we ran the mark function, but time had not gone far. no changes
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -662,7 +662,7 @@ func TestOperationCleanerBlockedByThrottle(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -688,7 +688,7 @@ func TestOperationCleanerBlockedByThrottle(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// assert that pending volume create got cleaned up
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -705,7 +705,7 @@ func TestOperationCleanerBlockedByThrottle(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// assert that pending volume create got cleaned up
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -719,7 +719,7 @@ func TestOperationCleanerBlockedByThrottle(t *testing.T) {
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
 	// assert that pending volume create got cleaned up
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -810,7 +810,7 @@ func TestBackgroundOperationCleaner(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -834,7 +834,7 @@ func TestBackgroundOperationCleaner(t *testing.T) {
 
 	time.Sleep(20 * time.Millisecond)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -847,7 +847,7 @@ func TestBackgroundOperationCleaner(t *testing.T) {
 	e = vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -858,7 +858,7 @@ func TestBackgroundOperationCleaner(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))
@@ -893,7 +893,7 @@ func TestBackgroundOperationCleanerWithTracking(t *testing.T) {
 	e := vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -921,7 +921,7 @@ func TestBackgroundOperationCleanerWithTracking(t *testing.T) {
 
 	time.Sleep(20 * time.Millisecond)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 1, "expected len(l) == 1, got:", len(l))
@@ -934,7 +934,7 @@ func TestBackgroundOperationCleanerWithTracking(t *testing.T) {
 	e = vc.Build()
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 2, "expected len(l) == 2, got:", len(l))
@@ -946,7 +946,7 @@ func TestBackgroundOperationCleanerWithTracking(t *testing.T) {
 	ot.Remove("FAKEFAKE")
 	time.Sleep(200 * time.Millisecond)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		l, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(l) == 0, "expected len(l) == 0, got:", len(l))

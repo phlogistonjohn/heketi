@@ -15,13 +15,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 const (
@@ -37,7 +37,7 @@ type DeviceEntry struct {
 	ExtentSize uint64
 }
 
-func DeviceList(tx *bolt.Tx) ([]string, error) {
+func DeviceList(tx *wdb.Tx) ([]string, error) {
 
 	list := EntryKeys(tx, BOLTDB_BUCKET_DEVICE)
 	if list == nil {
@@ -69,7 +69,7 @@ func NewDeviceEntryFromRequest(req *api.DeviceAddRequest) *DeviceEntry {
 	return device
 }
 
-func NewDeviceEntryFromId(tx *bolt.Tx, id string) (*DeviceEntry, error) {
+func NewDeviceEntryFromId(tx *wdb.Tx, id string) (*DeviceEntry, error) {
 	godbc.Require(tx != nil)
 
 	entry := NewDeviceEntry()
@@ -97,7 +97,7 @@ func (d *DeviceEntry) BucketName() string {
 	return BOLTDB_BUCKET_DEVICE
 }
 
-func (d *DeviceEntry) Save(tx *bolt.Tx) error {
+func (d *DeviceEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(d.Info.Id) > 0)
 
@@ -132,7 +132,7 @@ func (d *DeviceEntry) CheckDelete() error {
 	return nil
 }
 
-func (d *DeviceEntry) Delete(tx *bolt.Tx) error {
+func (d *DeviceEntry) Delete(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 
 	if err := d.CheckDelete(); err != nil {
@@ -143,7 +143,7 @@ func (d *DeviceEntry) Delete(tx *bolt.Tx) error {
 }
 
 func (d *DeviceEntry) modifyState(db wdb.DB, s api.EntryState) error {
-	return db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *wdb.Tx) error {
 		// Save state
 		d.State = s
 		// Save new state
@@ -229,7 +229,7 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 	return nil
 }
 
-func (d *DeviceEntry) NewInfoResponse(tx *bolt.Tx) (*api.DeviceInfoResponse, error) {
+func (d *DeviceEntry) NewInfoResponse(tx *wdb.Tx) (*api.DeviceInfoResponse, error) {
 
 	godbc.Require(tx != nil)
 
@@ -403,7 +403,7 @@ func (d *DeviceEntry) Remove(db wdb.DB,
 	}
 	// tests currently expect d to be updated to match db state
 	// this is another fairly ugly hack
-	return db.View(func(tx *bolt.Tx) error {
+	return db.View(func(tx *wdb.Tx) error {
 		dbdev, err := NewDeviceEntryFromId(tx, d.Info.Id)
 		if err != nil {
 			return err
@@ -422,7 +422,7 @@ func (d *DeviceEntry) removeBricksFromDevice(db wdb.DB,
 	for _, brickId := range d.Bricks {
 		var brickEntry *BrickEntry
 		var volumeEntry *VolumeEntry
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			var err error
 			brickEntry, err = NewBrickEntryFromId(tx, brickId)
 			if err != nil {
@@ -455,7 +455,7 @@ func (d *DeviceEntry) removeBricksFromDevice(db wdb.DB,
 	return nil
 }
 
-func DeviceEntryUpgrade(tx *bolt.Tx) error {
+func DeviceEntryUpgrade(tx *wdb.Tx) error {
 	return nil
 }
 
@@ -464,7 +464,7 @@ func DeviceEntryUpgrade(tx *bolt.Tx) error {
 // if any db errors were encountered.
 func PendingOperationsOnDevice(db wdb.RODB, deviceId string) (pdev bool, e error) {
 
-	e = db.View(func(tx *bolt.Tx) error {
+	e = db.View(func(tx *wdb.Tx) error {
 		pb, err := MapPendingBricks(tx)
 		if err != nil {
 			return err
@@ -524,7 +524,7 @@ func markEmptyDeviceFailed(db wdb.DB, id string) error {
 // returns nil. If ErrConflict is returned the device was not
 // empty. Any other error is a database failure.
 func markDeviceFailed(db wdb.DB, id string, force bool) error {
-	return db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *wdb.Tx) error {
 		d, err := NewDeviceEntryFromId(tx, id)
 		if err != nil {
 			return err
@@ -537,7 +537,7 @@ func markDeviceFailed(db wdb.DB, id string, force bool) error {
 	})
 }
 
-func (d *DeviceEntry) DeleteBricksWithEmptyPath(tx *bolt.Tx) error {
+func (d *DeviceEntry) DeleteBricksWithEmptyPath(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	var bricksToDelete []*BrickEntry
 

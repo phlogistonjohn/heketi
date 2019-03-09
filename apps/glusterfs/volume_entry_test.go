@@ -19,13 +19,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/boltdb/bolt"
+	"github.com/heketi/tests"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/sortedstrings"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func createSampleReplicaVolumeEntry(size int, replica int) *VolumeEntry {
@@ -55,7 +55,7 @@ func setupSampleDbWithTopologyWithZones(app *App,
 	clusters, zones_per_cluster, nodes_per_cluster, devices_per_node int,
 	disksize uint64) error {
 
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		for c := 0; c < clusters; c++ {
 			cluster := createSampleClusterEntry()
 
@@ -107,7 +107,7 @@ func setupSampleDbWithTopologyWithZones(app *App,
 func setupSampleDbWithUnbalancedTopology(app *App,
 	zones int, disksize uint64) error {
 
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		cluster := createSampleClusterEntry()
 
 		for z := 1; z <= zones; z++ {
@@ -408,7 +408,7 @@ func TestVolumeEntryFromIdNotFound(t *testing.T) {
 	defer app.Close()
 
 	// Test for ID not found
-	err := app.db.View(func(tx *bolt.Tx) error {
+	err := app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewVolumeEntryFromId(tx, "123")
 		return err
 	})
@@ -428,14 +428,14 @@ func TestVolumeEntryFromId(t *testing.T) {
 	v := createSampleReplicaVolumeEntry(1024, 2)
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return v.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Load from database
 	var entry *VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 		return err
@@ -457,14 +457,14 @@ func TestVolumeEntrySaveDelete(t *testing.T) {
 	v := createSampleReplicaVolumeEntry(1024, 2)
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return v.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Delete entry which has devices
 	var entry *VolumeEntry
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
@@ -482,7 +482,7 @@ func TestVolumeEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check volume has been deleted and is not in db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
@@ -520,7 +520,7 @@ func TestNewVolumeEntryNewInfoResponse(t *testing.T) {
 
 	// Retrieve info response
 	var info *api.VolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		volume, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -557,7 +557,7 @@ func TestVolumeEntryCreateMissingCluster(t *testing.T) {
 	v.Info.Clusters = []string{}
 
 	// Save in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return v.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -593,7 +593,7 @@ func TestVolumeEntryCreateRunOutOfSpaceMinBrickSizeLimit(t *testing.T) {
 	tests.Assert(t, v.Info.Cluster == "")
 
 	// Check database volume does not exist
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		return err
 	})
@@ -602,7 +602,7 @@ func TestVolumeEntryCreateRunOutOfSpaceMinBrickSizeLimit(t *testing.T) {
 	// Check no bricks or volumes exist
 	var bricks []string
 	var volumes []string
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		bricks = EntryKeys(tx, BOLTDB_BUCKET_BRICK)
 		volumes = EntryKeys(tx, BOLTDB_BUCKET_VOLUME)
 
@@ -640,7 +640,7 @@ func TestVolumeEntryCreateRunOutOfSpaceMaxBrickLimit(t *testing.T) {
 	tests.Assert(t, err == ErrNoSpace)
 
 	// Check database volume does not exist
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		return err
 	})
@@ -649,7 +649,7 @@ func TestVolumeEntryCreateRunOutOfSpaceMaxBrickLimit(t *testing.T) {
 	// Check no bricks or volumes exist
 	var bricks []string
 	var volumes []string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bricks = EntryKeys(tx, BOLTDB_BUCKET_BRICK)
 
 		volumes = EntryKeys(tx, BOLTDB_BUCKET_VOLUME)
@@ -710,7 +710,7 @@ func TestVolumeEntryCreateTwoBricks(t *testing.T) {
 	// Check database
 	var info *api.VolumeInfoResponse
 	var nodelist sort.StringSlice
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -767,7 +767,7 @@ func TestVolumeEntryCreateTwoBricks(t *testing.T) {
 		info)
 
 	// Check all hosts are in the list
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		for _, brick := range info.Bricks {
 			found := false
 
@@ -814,7 +814,7 @@ func TestVolumeEntryCreateBrickDivision(t *testing.T) {
 
 	var info *api.VolumeInfoResponse
 	var nodelist sort.StringSlice
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -895,7 +895,7 @@ func TestVolumeEntryCreateMaxBrickSize(t *testing.T) {
 
 	// Get volume information
 	var info *api.VolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -939,7 +939,7 @@ func TestVolumeEntryCreateOnClustersRequested(t *testing.T) {
 
 	// Get a cluster list
 	var clusters sort.StringSlice
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		clusters, err = ClusterList(tx)
 		return err
@@ -959,7 +959,7 @@ func TestVolumeEntryCreateOnClustersRequested(t *testing.T) {
 
 	// Check database volume does not exist
 	var info *api.VolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -984,7 +984,7 @@ func TestVolumeEntryCreateOnClustersRequested(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check database volume exists
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -1022,7 +1022,7 @@ func TestVolumeEntryCreateCheckingClustersForSpace(t *testing.T) {
 
 	// Create one large cluster
 	cluster := createSampleClusterEntry()
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		for n := 0; n < 100; n++ {
 			node := createSampleNodeEntry()
 			node.Info.ClusterId = cluster.Info.Id
@@ -1062,7 +1062,7 @@ func TestVolumeEntryCreateCheckingClustersForSpace(t *testing.T) {
 
 	// Check database volume exists
 	var info *api.VolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -1109,7 +1109,7 @@ func TestVolumeEntryCreateWithSnapshot(t *testing.T) {
 
 	// Check database volume exists
 	var info *api.VolumeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -1127,7 +1127,7 @@ func TestVolumeEntryCreateWithSnapshot(t *testing.T) {
 
 	// Check that it used only two bricks each with only two replicas
 	tests.Assert(t, len(info.Bricks) == 2)
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, b := range info.Bricks {
 			device, err := NewDeviceEntryFromId(tx, b.DeviceId)
 			if err != nil {
@@ -1173,7 +1173,7 @@ func TestVolumeEntryCreateBrickCreationFailure(t *testing.T) {
 	tests.Assert(t, err == mockerror, err, mockerror)
 
 	// Check database is still clean. No bricks and No volumes
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		volumes, err := VolumeList(tx)
 		tests.Assert(t, err == nil)
 		tests.Assert(t, len(volumes) == 0)
@@ -1227,7 +1227,7 @@ func TestVolumeEntryCreateVolumeCreationFailure(t *testing.T) {
 	tests.Assert(t, err == mockerror)
 
 	// Check database is still clean. No bricks and No volumes
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		volumes, err := VolumeList(tx)
 		tests.Assert(t, err == nil)
 		tests.Assert(t, len(volumes) == 0)
@@ -1284,7 +1284,7 @@ func TestVolumeEntryDestroy(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check database volume does not exist
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 
 		// Check that all devices have no used data
 		devices, err := DeviceList(tx)
@@ -1306,7 +1306,7 @@ func TestVolumeEntryDestroy(t *testing.T) {
 	})
 
 	// Check that the devices have no bricks
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		devices, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -1325,7 +1325,7 @@ func TestVolumeEntryDestroy(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check that the cluster has no volumes
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		clusters, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -1378,7 +1378,7 @@ func TestVolumeEntryExpandNoSpace(t *testing.T) {
 
 	// Check db is the same as before expansion
 	var entry *VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 
@@ -1458,7 +1458,7 @@ func TestVolumeEntryExpandCreateBricksFailure(t *testing.T) {
 
 	// Check db is the same as before expansion
 	var entry *VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 
@@ -1500,7 +1500,7 @@ func TestVolumeEntryExpand(t *testing.T) {
 
 	// Check db
 	var entry *VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		entry, err = NewVolumeEntryFromId(tx, v.Info.Id)
 
@@ -1658,7 +1658,7 @@ func TestReplaceBrickInVolume(t *testing.T) {
 	tests.Assert(t, err == nil, err)
 	var brickNames []string
 	var be *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -1714,7 +1714,7 @@ func TestReplaceBrickInVolume(t *testing.T) {
 	brickOnOldNode := false
 	oldBrickIdExists := false
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -1773,7 +1773,7 @@ func TestNewVolumeEntryWithVolumeOptions(t *testing.T) {
 
 	// Check that the data on the database is recorded correctly
 	var entry VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		return entry.Unmarshal(
 			tx.Bucket([]byte(BOLTDB_BUCKET_VOLUME)).
 				Get([]byte(v.Info.Id)))
@@ -1849,7 +1849,7 @@ func TestNewVolumeEntryWithTSPForMountHosts(t *testing.T) {
 
 	// Check that the data on the database is recorded correctly
 	var entry VolumeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		return entry.Unmarshal(
 			tx.Bucket([]byte(BOLTDB_BUCKET_VOLUME)).
 				Get([]byte(v.Info.Id)))
@@ -1881,7 +1881,7 @@ func TestReplaceBrickInVolumeSelfHeal1(t *testing.T) {
 	tests.Assert(t, err == nil, err)
 	var brickNames []string
 	var be *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -1935,7 +1935,7 @@ func TestReplaceBrickInVolumeSelfHeal1(t *testing.T) {
 	brickOnOldNode := false
 	oldBrickIdExists := false
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -1982,7 +1982,7 @@ func TestReplaceBrickInVolumeSelfHeal2(t *testing.T) {
 	tests.Assert(t, err == nil, err)
 	var brickNames []string
 	var be *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -2039,7 +2039,7 @@ func TestReplaceBrickInVolumeSelfHeal2(t *testing.T) {
 	brickOnOldNode := false
 	oldBrickIdExists := false
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -2086,7 +2086,7 @@ func TestReplaceBrickInVolumeSelfHealQuorumNotMet(t *testing.T) {
 	tests.Assert(t, err == nil, err)
 	var brickNames []string
 	var be *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -2140,7 +2140,7 @@ func TestReplaceBrickInVolumeSelfHealQuorumNotMet(t *testing.T) {
 	brickOnOldNode := false
 	oldBrickIdExists := false
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 
 		for _, brick := range v.Bricks {
 			be, err = NewBrickEntryFromId(tx, brick)
@@ -2181,7 +2181,7 @@ func TestVolumeEntryNoMatchingFlags(t *testing.T) {
 	)
 	tests.Assert(t, err == nil)
 	// now change the clusters to disable block access
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		cl, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -2226,7 +2226,7 @@ func TestVolumeEntryMissingFlags(t *testing.T) {
 	)
 	tests.Assert(t, err == nil)
 	// now change the clusters to disable block and file flags
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		cl, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -2297,7 +2297,7 @@ func TestVolumeCreateBrickAlloc(t *testing.T) {
 
 	// verify that the corrent number of bricks is saved in the DB
 	var bc int
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, err := BrickList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		bc = len(bl)
@@ -2349,7 +2349,7 @@ func TestVolumeCreateConcurrent(t *testing.T) {
 	}
 
 	brickCount := 0
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		devices, err := DeviceList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(devices) == 24,
@@ -2403,7 +2403,7 @@ func TestVolumeCreateArbiter(t *testing.T) {
 	// verify that the mock volume create was called
 	tests.Assert(t, cc == 1, "expected cc == 1, got:", cc)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, err := BrickList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(bl) == 3,
@@ -2450,7 +2450,7 @@ func TestVolumeCreateArbiterSizing(t *testing.T) {
 	// verify that the mock volume create was called
 	tests.Assert(t, cc == 1, "expected cc == 1, got:", cc)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, err := BrickList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(bl) == 3,
@@ -2507,7 +2507,7 @@ func TestVolumeCreateArbiterSizingCustom(t *testing.T) {
 	// verify that the mock volume create was called
 	tests.Assert(t, cc == 1, "expected cc == 1, got:", cc)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bl, err := BrickList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(bl) == 3,
@@ -2582,7 +2582,7 @@ func TestVolumeCreateMultiClusterErrorsNodes(t *testing.T) {
 	)
 
 	var clusters []string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		clusters, err = ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
@@ -2622,7 +2622,7 @@ func TestVolumeCreateMultiClusterErrorsDevices(t *testing.T) {
 	)
 
 	var clusters []string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		clusters, err = ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
@@ -2668,7 +2668,7 @@ func TestVolumeCreateRollbackSpaceReclaimed(t *testing.T) {
 	)
 	tests.Assert(t, err == nil, "expected err == nil, got", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		devices, e := DeviceList(tx)
 		if e != nil {
 			return e
@@ -2702,7 +2702,7 @@ func TestVolumeCreateRollbackSpaceReclaimed(t *testing.T) {
 	e = vc.Rollback(app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		pol, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(pol) == 0, "expected len(pol) == 0, got", len(pol))
@@ -2745,7 +2745,7 @@ func TestBlockVolumeCreateRollbackSpaceReclaimed(t *testing.T) {
 	)
 	tests.Assert(t, err == nil, "expected err == nil, got", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		devices, e := DeviceList(tx)
 		if e != nil {
 			return e
@@ -2774,7 +2774,7 @@ func TestBlockVolumeCreateRollbackSpaceReclaimed(t *testing.T) {
 	e = bc.Rollback(app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got", e)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		pol, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(pol) == 0, "expected len(pol) == 0, got", len(pol))
@@ -3078,7 +3078,7 @@ func testVolumeCreateUnbalanced(t *testing.T, app *App) bool {
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 		zones := map[int]bool{}
-		err = app.db.View(func(tx *bolt.Tx) error {
+		err = app.db.View(func(tx *wdb.Tx) error {
 			for _, brickId := range v.Bricks {
 				be, err := NewBrickEntryFromId(tx, brickId)
 				if err != nil {
@@ -3124,7 +3124,7 @@ func TestVolumeExpandStrictZones(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got", err)
 
 	var singleZoneNode string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		zc := map[int]int{}
 		zn := map[int]string{}
 		nids, err := NodeList(tx)
@@ -3161,7 +3161,7 @@ func TestVolumeExpandStrictZones(t *testing.T) {
 		// disable the node leaving only three nodes and two zones
 		// online
 		var v2x *VolumeEntry
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			var err error
 			v2x, err = NewVolumeEntryFromId(tx, vexpand)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
@@ -3181,7 +3181,7 @@ func TestVolumeExpandStrictZones(t *testing.T) {
 	t.Run("nodeUp", func(t *testing.T) {
 		// ensure that the single node in a zone is online
 		var v2x *VolumeEntry
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			var err error
 			v2x, err = NewVolumeEntryFromId(tx, vexpand)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
@@ -3226,7 +3226,7 @@ func testVolumeReplaceBrickZoneChecking(
 	tests.Assert(t, err == nil, "expected err == nil, got", err)
 
 	var singleZoneNode string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		zc := map[int]int{}
 		zn := map[int]string{}
 		nids, err := NodeList(tx)
@@ -3259,7 +3259,7 @@ func testVolumeReplaceBrickZoneChecking(
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	var brickNames []string
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, brick := range v.Bricks {
 			be, err := NewBrickEntryFromId(tx, brick)
 			if err != nil {
@@ -3299,7 +3299,7 @@ func testVolumeReplaceBrickZoneChecking(
 		return h, nil
 	}
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		node, err := NewNodeEntryFromId(tx, singleZoneNode)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)

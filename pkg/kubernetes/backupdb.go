@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/boltdb/bolt"
 	wdb "github.com/heketi/heketi/pkg/db"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +65,7 @@ func KubeBackupDbToSecret(db wdb.RODB) error {
 	}
 
 	// Get a backup
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		var backup bytes.Buffer
 
 		gz := gzip.NewWriter(&backup)

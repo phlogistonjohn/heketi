@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
 
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
 )
@@ -51,7 +51,7 @@ func (a *App) AppOperationsInfo() (*api.OperationsInfo, error) {
 func (a *App) OperationsInfo(w http.ResponseWriter, r *http.Request) {
 	info := &api.OperationsInfo{}
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		ops, err := PendingOperationList(tx)
 		if err != nil {
 			return err
@@ -85,7 +85,7 @@ func (a *App) PendingOperationList(w http.ResponseWriter, r *http.Request) {
 	p := &api.PendingOperationListResponse{}
 	tracked := a.optracker.Tracked()
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		ops, err := PendingOperationList(tx)
 		if err != nil {
 			return err
@@ -121,7 +121,7 @@ func (a *App) PendingOperationDetails(w http.ResponseWriter, r *http.Request) {
 	pid := vars["id"]
 	var info *api.PendingOperationDetails
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		pop, err := NewPendingOperationEntryFromId(tx, pid)
 		if err != nil {
 			return err

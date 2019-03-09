@@ -12,7 +12,6 @@ package glusterfs
 import (
 	"fmt"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
@@ -71,7 +70,7 @@ func (v *VolumeEntry) brickNameMap(db wdb.RODB) (
 
 	bmap := map[string]*BrickEntry{}
 
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, brickid := range v.BricksIds() {
 			brickEntry, err := NewBrickEntryFromId(tx, brickid)
 			if err != nil {
@@ -212,7 +211,7 @@ func (v *VolumeEntry) prepForBrickReplacement(db wdb.DB,
 	var oldDeviceEntry *DeviceEntry
 	var oldBrickNodeEntry *NodeEntry
 
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		var err error
 		oldBrickEntry, err = NewBrickEntryFromId(tx, oldBrickId)
 		if err != nil {
@@ -296,7 +295,7 @@ func (v *VolumeEntry) allocBrickReplacement(db wdb.DB,
 	newDeviceEntry *DeviceEntry, err error) {
 
 	var r *BrickAllocation
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 		// returns true if new device differs from old device
 		diffDevice := func(bs *BrickSet, d *DeviceEntry) bool {
 			return oldDeviceEntry.Info.Id != d.Info.Id
@@ -370,7 +369,7 @@ func (v *VolumeEntry) replaceBrickInVolume(db wdb.DB, executor executors.Executo
 
 	defer func() {
 		if e != nil {
-			db.Update(func(tx *bolt.Tx) error {
+			db.Update(func(tx *wdb.Tx) error {
 				newDeviceEntry, err = NewDeviceEntryFromId(tx, newBrickEntry.Info.DeviceId)
 				if err != nil {
 					return err
@@ -383,7 +382,7 @@ func (v *VolumeEntry) replaceBrickInVolume(db wdb.DB, executor executors.Executo
 	}()
 
 	var newBrickNodeEntry *NodeEntry
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		newBrickNodeEntry, err = NewNodeEntryFromId(tx, newBrickEntry.Info.NodeId)
 		if err != nil {
 			return err
@@ -430,7 +429,7 @@ func (v *VolumeEntry) replaceBrickInVolume(db wdb.DB, executor executors.Executo
 	// We must read entries from db again as state on disk might
 	// have changed
 
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 		err = newBrickEntry.Save(tx)
 		if err != nil {
 			return err
@@ -493,7 +492,7 @@ func (v *VolumeEntry) allocBricks(
 		// Check the named return value 'err'
 		if e != nil {
 			logger.Debug("Error detected.  Cleaning up volume %v: Len(%v) ", v.Info.Id, len(brick_entries))
-			db.Update(func(tx *bolt.Tx) error {
+			db.Update(func(tx *wdb.Tx) error {
 				for _, brick := range brick_entries {
 					brick.remove(tx, v)
 				}
@@ -504,7 +503,7 @@ func (v *VolumeEntry) allocBricks(
 
 	// mimic the previous unconditional db update behavior
 	opts := NewVolumePlacementOpts(v, brick_size, bricksets)
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *wdb.Tx) error {
 		dsrc := NewClusterDeviceSource(tx, cluster)
 		placer := PlacerForVolume(v)
 

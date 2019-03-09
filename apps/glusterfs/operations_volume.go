@@ -14,8 +14,6 @@ import (
 
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-
-	"github.com/boltdb/bolt"
 )
 
 // VolumeCreateOperation implements the operation functions used to
@@ -83,7 +81,7 @@ func (vc *VolumeCreateOperation) MaxRetries() int {
 // Build allocates and saves new volume and brick entries (tagged as pending)
 // in the db.
 func (vc *VolumeCreateOperation) Build() error {
-	return vc.db.Update(func(tx *bolt.Tx) error {
+	return vc.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		brick_entries, err := vc.vol.createVolumeComponents(txdb)
 		if err != nil {
@@ -123,7 +121,7 @@ func (vc *VolumeCreateOperation) Exec(executor executors.Executor) error {
 
 // Finalize marks our new volume and brick db entries as no longer pending.
 func (vc *VolumeCreateOperation) Finalize() error {
-	return vc.db.Update(func(tx *bolt.Tx) error {
+	return vc.db.Update(func(tx *wdb.Tx) error {
 		brick_entries, err := bricksFromOp(wdb.WrapTx(tx), vc.op, vc.vol.Info.Gid)
 		if err != nil {
 			logger.LogError("Failed to get bricks from op: %v", err)
@@ -234,7 +232,7 @@ func (ve *VolumeExpandOperation) ResourceUrl() string {
 // Build determines what new bricks needs to be created to satisfy the
 // new volume size. It marks new bricks as pending in the db.
 func (ve *VolumeExpandOperation) Build() error {
-	return ve.db.Update(func(tx *bolt.Tx) error {
+	return ve.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		brick_entries, err := ve.vol.expandVolumeComponents(
 			txdb, ve.ExpandSize, false)
@@ -278,7 +276,7 @@ func (ve *VolumeExpandOperation) Rollback(executor executors.Executor) error {
 // Finalize marks new bricks as no longer pending and updates the size
 // of the existing volume entry.
 func (ve *VolumeExpandOperation) Finalize() error {
-	return ve.db.Update(func(tx *bolt.Tx) error {
+	return ve.db.Update(func(tx *wdb.Tx) error {
 		brick_entries, err := bricksFromOp(wdb.WrapTx(tx), ve.op, ve.vol.Info.Gid)
 		if err != nil {
 			logger.LogError("Failed to get bricks from op: %v", err)
@@ -318,7 +316,7 @@ func (ve *VolumeExpandOperation) Clean(executor executors.Executor) error {
 		err  error
 		bmap brickHostMap
 	)
-	err = ve.db.Update(func(tx *bolt.Tx) error {
+	err = ve.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		v, err := NewVolumeEntryFromId(tx, ve.vol.Info.Id)
 		if err != nil {
@@ -348,7 +346,7 @@ func (ve *VolumeExpandOperation) CleanDone() error {
 	logger.Info("Clean is done for %v op:%v", ve.Label(), ve.op.Id)
 	// reminder: a volume's size is expanded during finalize and
 	// thus retains the original size until op succeeds
-	return ve.db.Update(func(tx *bolt.Tx) error {
+	return ve.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		v, err := NewVolumeEntryFromId(tx, ve.vol.Info.Id)
 		if err != nil {
@@ -424,7 +422,7 @@ func (vdel *VolumeDeleteOperation) ResourceUrl() string {
 // Build determines what volumes and bricks need to be deleted and
 // marks the db entries as such.
 func (vdel *VolumeDeleteOperation) Build() error {
-	return vdel.db.Update(func(tx *bolt.Tx) error {
+	return vdel.db.Update(func(tx *wdb.Tx) error {
 		v, err := NewVolumeEntryFromId(tx, vdel.vol.Info.Id)
 		if err != nil {
 			return err
@@ -477,7 +475,7 @@ func (vdel *VolumeDeleteOperation) Rollback(executor executors.Executor) error {
 	// currently rollback only removes the pending operation for delete volume,
 	// leaving the db in the same state as it was before an exec failure.
 	// In the future we should make this operation resume-able
-	return vdel.db.Update(func(tx *bolt.Tx) error {
+	return vdel.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		brick_entries, err := bricksFromOp(txdb, vdel.op, vdel.vol.Info.Gid)
 		if err != nil {
@@ -566,7 +564,7 @@ func (vc *VolumeCloneOperation) ResourceUrl() string {
 }
 
 func (vc *VolumeCloneOperation) Build() error {
-	return vc.db.Update(func(tx *bolt.Tx) error {
+	return vc.db.Update(func(tx *wdb.Tx) error {
 		vc.op.RecordCloneVolume(vc.vol)
 		clone, bricks, devices, err := vc.vol.prepareVolumeClone(tx, vc.clonename)
 		if err != nil {
@@ -634,7 +632,7 @@ func (vc *VolumeCloneOperation) Exec(executor executors.Executor) error {
 }
 
 func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
-	return vc.db.Update(func(tx *bolt.Tx) error {
+	return vc.db.Update(func(tx *wdb.Tx) error {
 		vc.op.FinalizeVolumeClone(vc.vol)
 		if e := vc.vol.Save(tx); e != nil {
 			return e
@@ -652,7 +650,7 @@ func (vc *VolumeCloneOperation) Rollback(executor executors.Executor) error {
 }
 
 func (vc *VolumeCloneOperation) Finalize() error {
-	return vc.db.Update(func(tx *bolt.Tx) error {
+	return vc.db.Update(func(tx *wdb.Tx) error {
 		vc.op.FinalizeVolumeClone(vc.vol)
 		if err := vc.vol.Save(tx); err != nil {
 			return err
@@ -693,7 +691,7 @@ func removeVolumeWithOp(
 		bmap  brickHostMap
 	)
 	logger.Info("preparing to remove volume %v in op:%v", volId, op.Id)
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		// get a fresh volume object from db
 		v, err = NewVolumeEntryFromId(tx, volId)
@@ -739,7 +737,7 @@ func expungeVolumeWithOp(
 	reclaimed ReclaimMap) (*VolumeEntry, error) {
 
 	var v *VolumeEntry
-	return v, db.Update(func(tx *bolt.Tx) error {
+	return v, db.Update(func(tx *wdb.Tx) error {
 		var err error
 		txdb := wdb.WrapTx(tx)
 		v, err = NewVolumeEntryFromId(tx, volId)

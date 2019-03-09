@@ -15,8 +15,6 @@ import (
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
-
-	"github.com/boltdb/bolt"
 )
 
 // VolumeSetBlockRestrictionOperation implements the operation functions
@@ -67,7 +65,7 @@ func (ro *VolumeSetBlockRestrictionOperation) Build() error {
 		// only in finalize, after any sanity checks are done.
 		return nil
 	}
-	return ro.db.Update(func(tx *bolt.Tx) error {
+	return ro.db.Update(func(tx *wdb.Tx) error {
 		v, err := NewVolumeEntryFromId(tx, ro.vol.Info.Id)
 		if err != nil {
 			return err
@@ -90,7 +88,7 @@ func (ro *VolumeSetBlockRestrictionOperation) Finalize() error {
 		// change was already made by build
 		return nil
 	}
-	return ro.db.Update(func(tx *bolt.Tx) error {
+	return ro.db.Update(func(tx *wdb.Tx) error {
 		v, err := NewVolumeEntryFromId(tx, ro.vol.Info.Id)
 		if err != nil {
 			return err

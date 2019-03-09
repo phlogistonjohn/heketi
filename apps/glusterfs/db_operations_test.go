@@ -13,10 +13,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/boltdb/bolt"
+	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
-	"github.com/heketi/tests"
 )
 
 func TestDeleteBricksWithEmptyPath(t *testing.T) {
@@ -49,7 +50,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	// grab a device that has bricks
 	var d *DeviceEntry
 	var newbrick *BrickEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err
@@ -79,14 +80,14 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 		newbrick = d.NewBrickEntry(102400, 1, 2000, idgen.GenUUID())
 		newbrick.Info.Path = ""
 		d.BrickAdd(newbrick.Id())
-		err = app.db.Update(func(tx *bolt.Tx) error {
+		err = app.db.Update(func(tx *wdb.Tx) error {
 			err = d.Save(tx)
 			tests.Assert(t, err == nil)
 			return newbrick.Save(tx)
 		})
 		tests.Assert(t, err == nil)
 	}
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -98,7 +99,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	err = DeleteBricksWithEmptyPath(app.db, true, []string{}, []string{}, []string{})
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -114,14 +115,14 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 		newbrick = d.NewBrickEntry(102400, 1, 2000, idgen.GenUUID())
 		newbrick.Info.Path = ""
 		d.BrickAdd(newbrick.Id())
-		err = app.db.Update(func(tx *bolt.Tx) error {
+		err = app.db.Update(func(tx *wdb.Tx) error {
 			err = d.Save(tx)
 			tests.Assert(t, err == nil)
 			return newbrick.Save(tx)
 		})
 		tests.Assert(t, err == nil)
 	}
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -132,7 +133,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	err = DeleteBricksWithEmptyPath(app.db, false, []string{}, []string{}, []string{d.Info.Id})
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -148,14 +149,14 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 		newbrick = d.NewBrickEntry(102400, 1, 2000, idgen.GenUUID())
 		newbrick.Info.Path = ""
 		d.BrickAdd(newbrick.Id())
-		err = app.db.Update(func(tx *bolt.Tx) error {
+		err = app.db.Update(func(tx *wdb.Tx) error {
 			err = d.Save(tx)
 			tests.Assert(t, err == nil)
 			return newbrick.Save(tx)
 		})
 		tests.Assert(t, err == nil)
 	}
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -166,7 +167,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	err = DeleteBricksWithEmptyPath(app.db, false, []string{}, []string{d.NodeId, d.NodeId}, []string{})
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -182,14 +183,14 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 		newbrick = d.NewBrickEntry(102400, 1, 2000, idgen.GenUUID())
 		newbrick.Info.Path = ""
 		d.BrickAdd(newbrick.Id())
-		err = app.db.Update(func(tx *bolt.Tx) error {
+		err = app.db.Update(func(tx *wdb.Tx) error {
 			err = d.Save(tx)
 			tests.Assert(t, err == nil)
 			return newbrick.Save(tx)
 		})
 		tests.Assert(t, err == nil)
 	}
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})
@@ -197,7 +198,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	tests.Assert(t, len(d.Bricks) == 40,
 		"expected len(d.Bricks) == 40, got:", len(d.Bricks))
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		nodeEntry, err = NewNodeEntryFromId(tx, d.NodeId)
 		return err
 	})
@@ -206,7 +207,7 @@ func TestDeleteBricksWithEmptyPath(t *testing.T) {
 	err = DeleteBricksWithEmptyPath(app.db, false, []string{nodeEntry.Info.ClusterId}, []string{d.NodeId}, []string{})
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, d.Info.Id)
 		return err
 	})

@@ -14,10 +14,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/boltdb/bolt"
+	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/heketi/tests"
 )
 
 func createSampleClusterEntry() *ClusterEntry {
@@ -154,7 +155,7 @@ func TestNewClusterEntryFromIdNotFound(t *testing.T) {
 	defer app.Close()
 
 	// Test for ID not found
-	err := app.db.View(func(tx *bolt.Tx) error {
+	err := app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewClusterEntryFromId(tx, "123")
 		return err
 	})
@@ -183,13 +184,13 @@ func TestNewClusterEntryFromId(t *testing.T) {
 	c.VolumeAdd("vol_abc")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return c.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var cluster *ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -230,13 +231,13 @@ func TestNewClusterEntrySaveDelete(t *testing.T) {
 	c.VolumeAdd("vol_abc")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return c.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var cluster *ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -255,7 +256,7 @@ func TestNewClusterEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, sortedstrings.Has(c.Info.Volumes, "vol_abc"))
 
 	// Delete entry which has devices
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -278,13 +279,13 @@ func TestNewClusterEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, len(cluster.Info.Nodes) == 2)
 
 	// Save cluster
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return cluster.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Try do delete a cluster which still has nodes
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -307,13 +308,13 @@ func TestNewClusterEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, len(cluster.Info.Nodes) == 0)
 
 	// Save cluster
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return cluster.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Now try to delete the cluster with no elements
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -331,7 +332,7 @@ func TestNewClusterEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check cluster has been deleted and is not in db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
@@ -364,13 +365,13 @@ func TestNewClusterEntryNewInfoResponse(t *testing.T) {
 	c.VolumeAdd("vol_abc")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return c.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var info *api.ClusterInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		cluster, err := NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
 			return err
@@ -407,14 +408,14 @@ func TestUpdateClusterEntryForFlags(t *testing.T) {
 	c.NodeAdd("node_abc")
 	c.NodeAdd("node_def")
 
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return c.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	//Read the cluster info again and verify flags
 	var info *api.ClusterInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		cluster, err := NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
 			return err
@@ -432,7 +433,7 @@ func TestUpdateClusterEntryForFlags(t *testing.T) {
 	tests.Assert(t, info.Block == false)
 
 	// remove the update flag from db
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		dbaentry, err := NewDbAttributeEntryFromKey(tx, DB_CLUSTER_HAS_FILE_BLOCK_FLAG)
 		if err != nil {
 			return err
@@ -448,7 +449,7 @@ func TestUpdateClusterEntryForFlags(t *testing.T) {
 	app = NewTestApp(tmpfile)
 	defer app.Close()
 
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		cluster, err := NewClusterEntryFromId(tx, c.Info.Id)
 		if err != nil {
 			return err

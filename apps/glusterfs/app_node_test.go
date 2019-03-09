@@ -20,14 +20,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+	"github.com/heketi/tests"
+
 	client "github.com/heketi/heketi/client/api/go-client"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func TestNodeAddBadRequests(t *testing.T) {
@@ -462,7 +463,7 @@ func TestNodeAddDelete(t *testing.T) {
 	tests.Assert(t, len(node.DevicesInfo) == 0)
 
 	// Check that the node has registered
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		b := tx.Bucket([]byte(BOLTDB_BUCKET_NODE))
 		tests.Assert(t, b != nil)
 
@@ -495,7 +496,7 @@ func TestNodeAddDelete(t *testing.T) {
 
 	// Check the data is in the database correctly
 	var entry *NodeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err = NewNodeEntryFromId(tx, node.Id)
 		return err
 	})
@@ -509,7 +510,7 @@ func TestNodeAddDelete(t *testing.T) {
 	tests.Assert(t, len(entry.Devices) == 0)
 
 	// Add some devices to check if delete conflict works
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		entry, err = NewNodeEntryFromId(tx, node.Id)
 		if err != nil {
 			return err
@@ -531,7 +532,7 @@ func TestNodeAddDelete(t *testing.T) {
 
 	// Check that nothing has changed in the db
 	var cluster *ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		entry, err = NewNodeEntryFromId(tx, node.Id)
 		if err != nil {
 			return err
@@ -548,7 +549,7 @@ func TestNodeAddDelete(t *testing.T) {
 	tests.Assert(t, sortedstrings.Has(cluster.Info.Nodes, node.Id))
 
 	// Node delete the drives
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		entry, err = NewNodeEntryFromId(tx, node.Id)
 		if err != nil {
 			return err
@@ -584,7 +585,7 @@ func TestNodeAddDelete(t *testing.T) {
 	}
 
 	// Check db to make sure key is removed
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		_, err = NewNodeEntryFromId(tx, node.Id)
 		return err
 	})
@@ -669,7 +670,7 @@ func TestNodeInfo(t *testing.T) {
 	node.Info.Zone = 10
 
 	// Save node in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return node.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -715,7 +716,7 @@ func TestNodeDeleteErrors(t *testing.T) {
 	node.Info.Zone = 10
 
 	// Save node in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return node.Save(tx)
 	})
 	tests.Assert(t, err == nil)
@@ -764,7 +765,7 @@ func TestNodePeerProbeFailure(t *testing.T) {
 
 	// Get cluter id
 	var clusterlist []string
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		clusterlist, err = ClusterList(tx)
 		return err
@@ -813,7 +814,7 @@ func TestNodePeerProbeFailure(t *testing.T) {
 	// Check that the node has not been added to the db
 	var nodelist []string
 	var cluster *ClusterEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, clusterid)
 		if err != nil {
@@ -875,7 +876,7 @@ func TestNodePeerDetachFailure(t *testing.T) {
 
 	// Get a node id
 	var nodeid string
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		clusterlist, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -922,7 +923,7 @@ func TestNodePeerDetachFailure(t *testing.T) {
 	}
 
 	// Check that the node is still in the db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		clusters, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -973,7 +974,7 @@ func TestNodePeerDetach(t *testing.T) {
 
 	// get list of nodes
 	var nodes []string
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		clusters, err := ClusterList(tx)
 		if err != nil {
 			return err
@@ -1399,7 +1400,7 @@ func TestNodeInfoAfterDelete(t *testing.T) {
 	}
 
 	// Check db to make sure key is removed
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		_, err = NewNodeEntryFromId(tx, nodeid)
 		return err
 	})
@@ -1444,7 +1445,7 @@ func TestNodeSetTags(t *testing.T) {
 	node.Info.Zone = 10
 
 	// Save node in the db
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return node.Save(tx)
 	})
 	tests.Assert(t, err == nil)

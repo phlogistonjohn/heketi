@@ -13,11 +13,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
-	"github.com/lpabon/godbc"
 )
 
 func (v *VolumeEntry) createVolume(db wdb.RODB,
@@ -55,7 +55,7 @@ func (v *VolumeEntry) updateHostandMountPoint(hosts []string, deletedHost string
 
 func getHostsFromCluster(db wdb.RODB, clusterID string) ([]string, error) {
 	hosts := []string{}
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *wdb.Tx) error {
 		cluster, err := NewClusterEntryFromId(tx, clusterID)
 		if err != nil {
 			return err
@@ -111,7 +111,7 @@ func (v *VolumeEntry) createVolumeRequest(db wdb.RODB,
 		vr.Bricks[i].Path = b.Info.Path
 
 		// Get storage host name from Node entry
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			node, err := NewNodeEntryFromId(tx, b.Info.NodeId)
 			if err != nil {
 				return err

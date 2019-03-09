@@ -13,10 +13,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/heketi/heketi/pkg/glusterfs/api"
-
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
 func TestVolumeSetBlockRestriction(t *testing.T) {
@@ -51,7 +51,7 @@ func TestVolumeSetBlockRestriction(t *testing.T) {
 	e := RunOperation(vc, app.executor)
 	tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bvl, e := BlockVolumeList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(bvl) == 0, "expected len(bvl) == 0, got", len(bvl))
@@ -92,7 +92,7 @@ func TestVolumeSetBlockRestriction(t *testing.T) {
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 	})
 	t.Run("UnsetLBU-ReservedAlready", func(t *testing.T) {
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.Restriction = api.LockedByUpdate
 			e := vol.Save(tx)
 			tests.Assert(t, e == nil, "expected e == nil, got:", e)
@@ -109,14 +109,14 @@ func TestVolumeSetBlockRestriction(t *testing.T) {
 	t.Run("UnsetLBU-FreeOk", func(t *testing.T) {
 		// return to original sizes after we muck with them
 		defer func(f, r int) {
-			app.db.Update(func(tx *bolt.Tx) error {
+			app.db.Update(func(tx *wdb.Tx) error {
 				vol.Info.BlockInfo.FreeSize = f
 				vol.Info.BlockInfo.ReservedSize = r
 				vol.Save(tx)
 				return nil
 			})
 		}(vol.Info.BlockInfo.FreeSize, vol.Info.BlockInfo.ReservedSize)
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.Restriction = api.LockedByUpdate
 			vol.Info.BlockInfo.ReservedSize = 0
 			e := vol.Save(tx)
@@ -134,14 +134,14 @@ func TestVolumeSetBlockRestriction(t *testing.T) {
 	t.Run("UnsetLBU-FreeBad", func(t *testing.T) {
 		// return to original sizes after we muck with them
 		defer func(f, r int) {
-			app.db.Update(func(tx *bolt.Tx) error {
+			app.db.Update(func(tx *wdb.Tx) error {
 				vol.Info.BlockInfo.FreeSize = f
 				vol.Info.BlockInfo.ReservedSize = r
 				vol.Save(tx)
 				return nil
 			})
 		}(vol.Info.BlockInfo.FreeSize, vol.Info.BlockInfo.ReservedSize)
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.Restriction = api.LockedByUpdate
 			vol.Info.BlockInfo.FreeSize = 1
 			vol.Info.BlockInfo.ReservedSize = 0
@@ -154,7 +154,7 @@ func TestVolumeSetBlockRestriction(t *testing.T) {
 		tests.Assert(t, e != nil, "expected e != nil, got:", e)
 	})
 	t.Run("GarbageValue", func(t *testing.T) {
-		app.db.Update(func(tx *bolt.Tx) error {
+		app.db.Update(func(tx *wdb.Tx) error {
 			vol.Info.BlockInfo.Restriction = "trogdor"
 			e := vol.Save(tx)
 			tests.Assert(t, e == nil, "expected e == nil, got:", e)

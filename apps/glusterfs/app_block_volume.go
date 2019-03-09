@@ -13,8 +13,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
 )
@@ -43,7 +44,7 @@ func (a *App) BlockVolumeCreate(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: factor this into a function (it's also in VolumeCreate)
 	// Check that the clusters requested are available
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 
 		// :TODO: All we need to do is check for one instead of gathering all keys
 		clusters, err := ClusterList(tx)
@@ -86,7 +87,7 @@ func (a *App) BlockVolumeList(w http.ResponseWriter, r *http.Request) {
 
 	var list api.BlockVolumeListResponse
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 
 		list.BlockVolumes, err = ListCompleteBlockVolumes(tx)
@@ -118,7 +119,7 @@ func (a *App) BlockVolumeInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Get volume information
 	var info *api.BlockVolumeInfoResponse
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewBlockVolumeEntryFromId(tx, id)
 		if err == ErrNotFound || !entry.Visible() {
 			http.Error(w, "Id not found", http.StatusNotFound)
@@ -153,7 +154,7 @@ func (a *App) BlockVolumeDelete(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var blockVolume *BlockVolumeEntry
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 		blockVolume, err = NewBlockVolumeEntryFromId(tx, id)
 		if err == ErrNotFound {

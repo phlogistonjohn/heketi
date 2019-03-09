@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
 
 	"github.com/heketi/heketi/executors"
@@ -50,7 +49,7 @@ func (a *App) DeviceAdd(w http.ResponseWriter, r *http.Request) {
 
 	// Check the node is in the db
 	var node *NodeEntry
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, msg.NodeId)
 		if err == ErrNotFound {
@@ -99,7 +98,7 @@ func (a *App) DeviceAdd(w http.ResponseWriter, r *http.Request) {
 		}()
 
 		// Save on db
-		err = a.db.Update(func(tx *bolt.Tx) error {
+		err = a.db.Update(func(tx *wdb.Tx) error {
 
 			nodeEntry, err := NewNodeEntryFromId(tx, msg.NodeId)
 			if err != nil {
@@ -146,7 +145,7 @@ func (a *App) DeviceInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Get device information
 	var info *api.DeviceInfoResponse
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewDeviceEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)
@@ -196,7 +195,7 @@ func (a *App) DeviceDelete(w http.ResponseWriter, r *http.Request) {
 		device *DeviceEntry
 		node   *NodeEntry
 	)
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 		// Access device entry
 		device, err = NewDeviceEntryFromId(tx, id)
@@ -249,7 +248,7 @@ func (a *App) DeviceDelete(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get info from db
-		err = a.db.Update(func(tx *bolt.Tx) error {
+		err = a.db.Update(func(tx *wdb.Tx) error {
 
 			// Access node entry
 			node, err := NewNodeEntryFromId(tx, device.NodeId)
@@ -313,7 +312,7 @@ func (a *App) DeviceSetState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for valid id, return immediately if not valid
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 		device, err = NewDeviceEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)
@@ -369,7 +368,7 @@ func (a *App) DeviceResync(w http.ResponseWriter, r *http.Request) {
 		brickSizesSum uint64
 	)
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 		device, err = NewDeviceEntryFromId(tx, deviceId)
 		if err != nil {
@@ -399,7 +398,7 @@ func (a *App) DeviceResync(w http.ResponseWriter, r *http.Request) {
 			return "", err
 		}
 
-		err = a.db.Update(func(tx *bolt.Tx) error {
+		err = a.db.Update(func(tx *wdb.Tx) error {
 
 			if p, err := PendingOperationsOnDevice(wdb.WrapTx(tx), deviceId); err != nil {
 				return err
@@ -475,7 +474,7 @@ func (a *App) DeviceSetTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		device, err = NewDeviceEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, "Id not found", http.StatusNotFound)

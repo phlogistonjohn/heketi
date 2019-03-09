@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
 	"github.com/gorilla/mux"
@@ -577,7 +577,7 @@ func TestAppServerResetStaleOps(t *testing.T) {
 	err = vc2.Build()
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		pol, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(pol) == 2, "expected len(pol) == 2, got", len(pol))
@@ -594,7 +594,7 @@ func TestAppServerResetStaleOps(t *testing.T) {
 	err = app.ServerReset()
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		pol, e := PendingOperationList(tx)
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		tests.Assert(t, len(pol) == 2, "expected len(pol) == 2, got", len(pol))

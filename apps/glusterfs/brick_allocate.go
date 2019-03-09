@@ -12,9 +12,9 @@ package glusterfs
 import (
 	"fmt"
 
-	"github.com/boltdb/bolt"
 	"github.com/lpabon/godbc"
 
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/idgen"
 )
 
@@ -270,13 +270,13 @@ func populateBrickSet(
 }
 
 type ClusterDeviceSource struct {
-	tx          *bolt.Tx
+	tx          *wdb.Tx
 	deviceCache map[string]*DeviceEntry
 	nodeCache   map[string]*NodeEntry
 	clusterId   string
 }
 
-func NewClusterDeviceSource(tx *bolt.Tx,
+func NewClusterDeviceSource(tx *wdb.Tx,
 	clusterId string) *ClusterDeviceSource {
 
 	return &ClusterDeviceSource{

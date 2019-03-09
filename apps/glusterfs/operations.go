@@ -14,8 +14,6 @@ import (
 
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-
-	"github.com/boltdb/bolt"
 )
 
 const (
@@ -138,7 +136,7 @@ func (om *OperationManager) Id() string {
 // MarkFailed marks the pending operation entry associated with
 // the operation as failed.
 func (om *OperationManager) MarkFailed() error {
-	return om.db.Update(func(tx *bolt.Tx) error {
+	return om.db.Update(func(tx *wdb.Tx) error {
 		// refresh entry
 		pop, err := NewPendingOperationEntryFromId(tx, om.op.Id)
 		if err != nil {
@@ -156,7 +154,7 @@ func bricksFromOp(db wdb.RODB,
 	op *PendingOperationEntry, gid int64) ([]*BrickEntry, error) {
 
 	brick_entries := []*BrickEntry{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, a := range op.Actions {
 			if a.Change == OpAddBrick || a.Change == OpDeleteBrick {
 				brick, err := NewBrickEntryFromId(tx, a.Id)
@@ -180,7 +178,7 @@ func volumesFromOp(db wdb.RODB,
 	op *PendingOperationEntry) ([]*VolumeEntry, error) {
 
 	volumeEntries := []*VolumeEntry{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, a := range op.Actions {
 			switch a.Change {
 			case OpAddVolume, OpDeleteVolume, OpExpandVolume:

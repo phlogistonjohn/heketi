@@ -16,6 +16,8 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 )
 
 type testDbEntry struct {
@@ -43,7 +45,7 @@ func TestEntryRegister(t *testing.T) {
 
 	// Create a bucket
 	entry := &testDbEntry{}
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 
 		// Create Cluster Bucket
 		_, err := tx.CreateBucketIfNotExists([]byte(entry.BucketName()))
@@ -58,7 +60,7 @@ func TestEntryRegister(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Try to write key again
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 
 		// Save again, it should not work
 		val, err := EntryRegister(tx, entry, "mykey", []byte("myvalue"))

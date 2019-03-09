@@ -25,9 +25,11 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
-	"github.com/heketi/tests"
 )
 
 func TestBlockVolumeCreateBadJson(t *testing.T) {
@@ -677,7 +679,7 @@ func TestBlockVolumeList(t *testing.T) {
 
 	// Create some volumes
 	numvolumes := 1000
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 
 		for i := 0; i < numvolumes; i++ {
 			v := createSampleBlockVolumeEntry(100)
@@ -705,7 +707,7 @@ func TestBlockVolumeList(t *testing.T) {
 	tests.Assert(t, len(msg.BlockVolumes) == numvolumes)
 
 	// Check that all the volumes are in the database
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, id := range msg.BlockVolumes {
 			_, err := NewBlockVolumeEntryFromId(tx, id)
 			if err != nil {
@@ -728,7 +730,7 @@ func TestBlockVolumeListReadOnlyDb(t *testing.T) {
 
 	// Create some volumes
 	numvolumes := 1000
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 
 		for i := 0; i < numvolumes; i++ {
 			v := createSampleBlockVolumeEntry(100)
@@ -774,7 +776,7 @@ func TestBlockVolumeListReadOnlyDb(t *testing.T) {
 	tests.Assert(t, len(msg.BlockVolumes) == numvolumes)
 
 	// Check that all the volumes are in the database
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		for _, id := range msg.BlockVolumes {
 			_, err := NewBlockVolumeEntryFromId(tx, id)
 			if err != nil {

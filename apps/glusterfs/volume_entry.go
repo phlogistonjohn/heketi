@@ -18,14 +18,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/paths"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 const (
@@ -70,7 +70,7 @@ type VolumeEntry struct {
 	Pending              PendingItem
 }
 
-func VolumeList(tx *bolt.Tx) ([]string, error) {
+func VolumeList(tx *wdb.Tx) ([]string, error) {
 
 	list := EntryKeys(tx, BOLTDB_BUCKET_VOLUME)
 	if list == nil {
@@ -176,7 +176,7 @@ func NewVolumeEntryFromRequest(req *api.VolumeCreateRequest) *VolumeEntry {
 	return vol
 }
 
-func NewVolumeEntryFromId(tx *bolt.Tx, id string) (*VolumeEntry, error) {
+func NewVolumeEntryFromId(tx *wdb.Tx, id string) (*VolumeEntry, error) {
 	godbc.Require(tx != nil)
 
 	entry := NewVolumeEntry()
@@ -220,18 +220,18 @@ func (v *VolumeEntry) BucketName() string {
 	return BOLTDB_BUCKET_VOLUME
 }
 
-func (v *VolumeEntry) Save(tx *bolt.Tx) error {
+func (v *VolumeEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(v.Info.Id) > 0)
 
 	return EntrySave(tx, v, v.Info.Id)
 }
 
-func (v *VolumeEntry) Delete(tx *bolt.Tx) error {
+func (v *VolumeEntry) Delete(tx *wdb.Tx) error {
 	return EntryDelete(tx, v, v.Info.Id)
 }
 
-func (v *VolumeEntry) NewInfoResponse(tx *bolt.Tx) (*api.VolumeInfoResponse, error) {
+func (v *VolumeEntry) NewInfoResponse(tx *wdb.Tx) (*api.VolumeInfoResponse, error) {
 	godbc.Require(tx != nil)
 
 	info := api.NewVolumeInfoResponse()
@@ -426,7 +426,7 @@ func (v *VolumeEntry) SetRawCapacity(delta int) error {
 // TotalSizeBlockVolumes returns the total size of the block volumes that
 // the given volume is hosting. This function iterates over the block
 // volumes in the db to calculate the total.
-func (v *VolumeEntry) TotalSizeBlockVolumes(tx *bolt.Tx) (int, error) {
+func (v *VolumeEntry) TotalSizeBlockVolumes(tx *wdb.Tx) (int, error) {
 	if !v.Info.Block {
 		return 0, fmt.Errorf(
 			"Volume %v is not a block hosting volume", v.Info.Id)
@@ -572,7 +572,7 @@ func (v *VolumeEntry) createVolumeComponents(
 	// Get list of clusters
 	var possibleClusters []string
 	if len(v.Info.Clusters) == 0 {
-		err := db.View(func(tx *bolt.Tx) error {
+		err := db.View(func(tx *wdb.Tx) error {
 			var err error
 			possibleClusters, err = ClusterList(tx)
 			return err
@@ -615,7 +615,7 @@ func (v *VolumeEntry) createVolumeExec(db wdb.DB,
 func (v *VolumeEntry) saveCreateVolume(db wdb.DB,
 	possibleClusters []string) (brick_entries []*BrickEntry, err error) {
 
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		// For each cluster look for storage space for this volume
 		brick_entries, err = v.tryAllocateBricks(txdb, possibleClusters)
@@ -686,7 +686,7 @@ func (v *VolumeEntry) deleteVolumeExec(db wdb.RODB,
 func (v *VolumeEntry) teardown(
 	db wdb.DB, brick_entries []*BrickEntry, reclaimed ReclaimMap) error {
 
-	return db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *wdb.Tx) error {
 		for _, brick := range brick_entries {
 			err := brick.removeAndFree(tx, v, reclaimed[brick.Info.DeviceId])
 			if err != nil {
@@ -712,7 +712,7 @@ func (v *VolumeEntry) teardown(
 func (v *VolumeEntry) manageHostFromBricks(db wdb.DB,
 	brick_entries []*BrickEntry) (sshhost string, err error) {
 
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		for _, brick := range brick_entries {
 			node, err := NewNodeEntryFromId(tx, brick.Info.NodeId)
 			if err != nil {
@@ -729,7 +729,7 @@ func (v *VolumeEntry) manageHostFromBricks(db wdb.DB,
 func (v *VolumeEntry) deleteVolumeComponents(
 	db wdb.RODB) (brick_entries []*BrickEntry, e error) {
 
-	e = db.View(func(tx *bolt.Tx) error {
+	e = db.View(func(tx *wdb.Tx) error {
 		for _, id := range v.BricksIds() {
 			brick, err := NewBrickEntryFromId(tx, id)
 			if err != nil {
@@ -755,7 +755,7 @@ func (v *VolumeEntry) expandVolumeComponents(db wdb.DB,
 	sizeGB int,
 	setSize bool) (brick_entries []*BrickEntry, e error) {
 
-	e = db.Update(func(tx *bolt.Tx) error {
+	e = db.Update(func(tx *wdb.Tx) error {
 		// Allocate new bricks in the cluster
 		txdb := wdb.WrapTx(tx)
 		var err error
@@ -823,7 +823,7 @@ func (v *VolumeEntry) BricksIds() sort.StringSlice {
 	return ids
 }
 
-func VolumeEntryUpgrade(tx *bolt.Tx) error {
+func VolumeEntryUpgrade(tx *wdb.Tx) error {
 	return nil
 }
 
@@ -842,7 +842,7 @@ func (v *VolumeEntry) Visible() bool {
 	return v.Pending.Id == ""
 }
 
-func volumeNameExistsInCluster(tx *bolt.Tx, cluster *ClusterEntry,
+func volumeNameExistsInCluster(tx *wdb.Tx, cluster *ClusterEntry,
 	name string) (found bool, e error) {
 	for _, volumeId := range cluster.Info.Volumes {
 		volume, err := NewVolumeEntryFromId(tx, volumeId)
@@ -878,7 +878,7 @@ func eligibleClusters(db wdb.RODB, req clusterReq,
 	}
 	candidateClusters := []string{}
 	cerr := ClusterErrorMap{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, clusterId := range possibleClusters {
 			c, err := NewClusterEntryFromId(tx, clusterId)
 			if err != nil {
@@ -942,7 +942,7 @@ func eligibleClusters(db wdb.RODB, req clusterReq,
 // for gluster commands.
 func (v *VolumeEntry) hosts(db wdb.RODB) (nodeHosts, error) {
 	var hosts nodeHosts
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		vol, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err
@@ -958,7 +958,7 @@ func (v *VolumeEntry) hosts(db wdb.RODB) (nodeHosts, error) {
 	return hosts, err
 }
 
-func (v *VolumeEntry) prepareVolumeClone(tx *bolt.Tx, clonename string) (
+func (v *VolumeEntry) prepareVolumeClone(tx *wdb.Tx, clonename string) (
 	*VolumeEntry, []*BrickEntry, []*DeviceEntry, error) {
 
 	if v.Info.Block {
@@ -1032,7 +1032,7 @@ func (v *VolumeEntry) cloneVolumeRequest(db wdb.RODB, clonename string) (*execut
 	vcr.Clone = clonename
 
 	var sshhost string
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		vol, err := NewVolumeEntryFromId(tx, v.Info.Id)
 		if err != nil {
 			return err

@@ -14,6 +14,7 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 )
@@ -63,7 +64,7 @@ type DbCheckResponse struct {
 	TotalInconsistencies int                   `json:"totalinconsistencies"`
 }
 
-func initializeBuckets(tx *bolt.Tx) error {
+func initializeBuckets(tx *wdb.Tx) error {
 	// Create Cluster Bucket
 	_, err := tx.CreateBucketIfNotExists([]byte(BOLTDB_BUCKET_CLUSTER))
 	if err != nil {
@@ -122,7 +123,7 @@ func initializeBuckets(tx *bolt.Tx) error {
 
 // UpgradeDB runs all upgrade routines in order to to update the DB
 // to the latest "schemas" and data.
-func UpgradeDB(tx *bolt.Tx) error {
+func UpgradeDB(tx *wdb.Tx) error {
 
 	err := ClusterEntryUpgrade(tx)
 	if err != nil {
@@ -190,7 +191,7 @@ func UpgradeDB(tx *bolt.Tx) error {
 	return nil
 }
 
-func upgradeDBGenerationID(tx *bolt.Tx) error {
+func upgradeDBGenerationID(tx *wdb.Tx) error {
 	_, err := NewDbAttributeEntryFromKey(tx, DB_GENERATION_ID)
 	switch err {
 	case ErrNotFound:
@@ -202,7 +203,7 @@ func upgradeDBGenerationID(tx *bolt.Tx) error {
 	}
 }
 
-func recordNewDBGenerationID(tx *bolt.Tx) error {
+func recordNewDBGenerationID(tx *wdb.Tx) error {
 	entry := NewDbAttributeEntry()
 	entry.Key = DB_GENERATION_ID
 	entry.Value = idgen.GenUUID()
@@ -231,7 +232,7 @@ func OpenDB(dbfilename string, ReadOnly bool) (dbhandle *bolt.DB, err error) {
 
 // fixIncorrectBlockHostingFreeSize attempts to fix invalid block hosting volume
 // free size amounts by checking them against the block volumes.
-func fixIncorrectBlockHostingFreeSize(tx *bolt.Tx) error {
+func fixIncorrectBlockHostingFreeSize(tx *wdb.Tx) error {
 	vols, err := VolumeList(tx)
 	if err != nil {
 		return err
@@ -279,7 +280,7 @@ func fixIncorrectBlockHostingFreeSize(tx *bolt.Tx) error {
 
 // fixBlockHostingReservedSize  attempts to set block hosting volume
 // free size amounts by checking them against the block volumes.
-func fixBlockHostingReservedSize(tx *bolt.Tx) error {
+func fixBlockHostingReservedSize(tx *wdb.Tx) error {
 	vols, err := VolumeList(tx)
 	if err != nil {
 		return err

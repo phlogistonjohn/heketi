@@ -13,8 +13,9 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	"github.com/boltdb/bolt"
 	"github.com/lpabon/godbc"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 )
 
 var (
@@ -37,7 +38,7 @@ func NewDbAttributeEntry() *DbAttributeEntry {
 	return entry
 }
 
-func NewDbAttributeEntryFromKey(tx *bolt.Tx, key string) (*DbAttributeEntry, error) {
+func NewDbAttributeEntryFromKey(tx *wdb.Tx, key string) (*DbAttributeEntry, error) {
 
 	entry := NewDbAttributeEntry()
 	err := EntryLoad(tx, entry, key)
@@ -52,14 +53,14 @@ func (dba *DbAttributeEntry) BucketName() string {
 	return BOLTDB_BUCKET_DBATTRIBUTE
 }
 
-func (dba *DbAttributeEntry) Save(tx *bolt.Tx) error {
+func (dba *DbAttributeEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(dba.Key) > 0)
 
 	return EntrySave(tx, dba, dba.Key)
 }
 
-func (dba *DbAttributeEntry) Delete(tx *bolt.Tx) error {
+func (dba *DbAttributeEntry) Delete(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 
 	return EntryDelete(tx, dba, dba.Key)
@@ -83,7 +84,7 @@ func (dba *DbAttributeEntry) Unmarshal(buffer []byte) error {
 	return nil
 }
 
-func DbAttributeList(tx *bolt.Tx) ([]string, error) {
+func DbAttributeList(tx *wdb.Tx) ([]string, error) {
 	list := EntryKeys(tx, BOLTDB_BUCKET_DBATTRIBUTE)
 	if list == nil {
 		return nil, ErrAccessList

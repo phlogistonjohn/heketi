@@ -12,8 +12,6 @@ package glusterfs
 import (
 	"strings"
 
-	"github.com/boltdb/bolt"
-
 	wdb "github.com/heketi/heketi/pkg/db"
 )
 
@@ -31,7 +29,7 @@ func NewDeviceZoneMap() *DeviceZoneMap {
 
 func NewDeviceZoneMapFromDb(db wdb.RODB) (*DeviceZoneMap, error) {
 	dzm := NewDeviceZoneMap()
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err

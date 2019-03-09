@@ -15,9 +15,10 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+
 	"github.com/heketi/heketi/pkg/db"
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
 )
@@ -103,7 +104,7 @@ func (a *App) VolumeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check that the clusters requested are available
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 
 		// :TODO: All we need to do is check for one instead of gathering all keys
 		clusters, err := ClusterList(tx)
@@ -161,7 +162,7 @@ func (a *App) VolumeList(w http.ResponseWriter, r *http.Request) {
 	var list api.VolumeListResponse
 
 	// Get all the cluster ids from the DB
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 
 		list.Volumes, err = ListCompleteVolumes(tx)
@@ -191,7 +192,7 @@ func (a *App) VolumeInfo(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var info *api.VolumeInfoResponse
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		entry, err := NewVolumeEntryFromId(tx, id)
 		if err == ErrNotFound || !entry.Visible() {
 			// treat an invisible entry like it doesn't exist
@@ -232,7 +233,7 @@ func (a *App) VolumeDelete(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var volume *VolumeEntry
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 
 		var err error
 		volume, err = NewVolumeEntryFromId(tx, id)
@@ -310,7 +311,7 @@ func (a *App) VolumeExpand(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("Size: %v", msg.Size)
 
 	var volume *VolumeEntry
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 
 		var err error
 		volume, err = NewVolumeEntryFromId(tx, id)
@@ -355,7 +356,7 @@ func (a *App) VolumeClone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var volume *VolumeEntry
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 		var err error // needed otherwise 'volume' will be nil after View()
 		volume, err = NewVolumeEntryFromId(tx, vol_id)
 		if err == ErrNotFound || !volume.Visible() {
@@ -401,7 +402,7 @@ func (a *App) VolumeSetBlockRestriction(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Check for valid id, return immediately if not valid
-	err = a.db.View(func(tx *bolt.Tx) error {
+	err = a.db.View(func(tx *wdb.Tx) error {
 		volume, err = NewVolumeEntryFromId(tx, id)
 		if err == ErrNotFound || !volume.Visible() {
 			// treat an invisible volume like it doesn't exist

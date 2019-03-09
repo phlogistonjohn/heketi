@@ -15,19 +15,19 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 type ClusterEntry struct {
 	Info api.ClusterInfoResponse
 }
 
-func ClusterList(tx *bolt.Tx) ([]string, error) {
+func ClusterList(tx *wdb.Tx) ([]string, error) {
 
 	list := EntryKeys(tx, BOLTDB_BUCKET_CLUSTER)
 	if list == nil {
@@ -58,7 +58,7 @@ func NewClusterEntryFromRequest(req *api.ClusterCreateRequest) *ClusterEntry {
 	return entry
 }
 
-func NewClusterEntryFromId(tx *bolt.Tx, id string) (*ClusterEntry, error) {
+func NewClusterEntryFromId(tx *wdb.Tx, id string) (*ClusterEntry, error) {
 
 	entry := NewClusterEntry()
 	err := EntryLoad(tx, entry, id)
@@ -73,7 +73,7 @@ func (c *ClusterEntry) BucketName() string {
 	return BOLTDB_BUCKET_CLUSTER
 }
 
-func (c *ClusterEntry) Save(tx *bolt.Tx) error {
+func (c *ClusterEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(c.Info.Id) > 0)
 
@@ -84,7 +84,7 @@ func (c *ClusterEntry) ConflictString() string {
 	return fmt.Sprintf("Unable to delete cluster [%v] because it contains volumes and/or nodes", c.Info.Id)
 }
 
-func (c *ClusterEntry) Delete(tx *bolt.Tx) error {
+func (c *ClusterEntry) Delete(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 
 	// Check if the cluster still has nodes or volumes
@@ -96,7 +96,7 @@ func (c *ClusterEntry) Delete(tx *bolt.Tx) error {
 	return EntryDelete(tx, c, c.Info.Id)
 }
 
-func (c *ClusterEntry) NewClusterInfoResponse(tx *bolt.Tx) (*api.ClusterInfoResponse, error) {
+func (c *ClusterEntry) NewClusterInfoResponse(tx *wdb.Tx) (*api.ClusterInfoResponse, error) {
 
 	info := &api.ClusterInfoResponse{}
 	*info = c.Info
@@ -133,7 +133,7 @@ func (c *ClusterEntry) Unmarshal(buffer []byte) error {
 	return nil
 }
 
-func (c *ClusterEntry) NodeEntryFromClusterIndex(tx *bolt.Tx, index int) (*NodeEntry, error) {
+func (c *ClusterEntry) NodeEntryFromClusterIndex(tx *wdb.Tx, index int) (*NodeEntry, error) {
 	node, err := NewNodeEntryFromId(tx, c.Info.Nodes[index])
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (c *ClusterEntry) NodeDelete(id string) {
 	c.Info.Nodes = sortedstrings.Delete(c.Info.Nodes, id)
 }
 
-func ClusterEntryUpgrade(tx *bolt.Tx) error {
+func ClusterEntryUpgrade(tx *wdb.Tx) error {
 	err := addBlockFileFlagsInClusterEntry(tx)
 	if err != nil {
 		return err
@@ -182,7 +182,7 @@ func ClusterEntryUpgrade(tx *bolt.Tx) error {
 	return nil
 }
 
-func addBlockFileFlagsInClusterEntry(tx *bolt.Tx) error {
+func addBlockFileFlagsInClusterEntry(tx *wdb.Tx) error {
 	entry, err := NewDbAttributeEntryFromKey(tx, DB_CLUSTER_HAS_FILE_BLOCK_FLAG)
 	// This key won't exist if we are introducing the feature now
 	if err != nil && err != ErrNotFound {
@@ -221,7 +221,7 @@ func addBlockFileFlagsInClusterEntry(tx *bolt.Tx) error {
 	return entry.Save(tx)
 }
 
-func (c *ClusterEntry) DeleteBricksWithEmptyPath(tx *bolt.Tx) error {
+func (c *ClusterEntry) DeleteBricksWithEmptyPath(tx *wdb.Tx) error {
 
 	logger.Debug("Deleting bricks with empty path in cluster [%v].",
 		c.Info.Id)
@@ -249,7 +249,7 @@ func (c *ClusterEntry) DeleteBricksWithEmptyPath(tx *bolt.Tx) error {
 // cluster.
 func (c *ClusterEntry) hosts(db wdb.RODB) (nodeHosts, error) {
 	hosts := nodeHosts{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, nodeId := range c.Info.Nodes {
 			node, err := NewNodeEntryFromId(tx, nodeId)
 			if err != nil {

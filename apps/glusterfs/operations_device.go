@@ -14,8 +14,6 @@ import (
 
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-
-	"github.com/boltdb/bolt"
 )
 
 // DeviceRemoveOperation is a phony-ish operation that exists
@@ -49,7 +47,7 @@ func (dro *DeviceRemoveOperation) ResourceUrl() string {
 }
 
 func (dro *DeviceRemoveOperation) Build() error {
-	return dro.db.Update(func(tx *bolt.Tx) error {
+	return dro.db.Update(func(tx *wdb.Tx) error {
 		d, err := NewDeviceEntryFromId(tx, dro.DeviceId)
 		if err != nil {
 			return err
@@ -108,7 +106,7 @@ func (dro *DeviceRemoveOperation) Exec(executor executors.Executor) error {
 	}
 
 	var d *DeviceEntry
-	if e := dro.db.View(func(tx *bolt.Tx) error {
+	if e := dro.db.View(func(tx *wdb.Tx) error {
 		d, err = NewDeviceEntryFromId(tx, id)
 		return err
 	}); e != nil {
@@ -119,7 +117,7 @@ func (dro *DeviceRemoveOperation) Exec(executor executors.Executor) error {
 }
 
 func (dro *DeviceRemoveOperation) Rollback(executor executors.Executor) error {
-	return dro.db.Update(func(tx *bolt.Tx) error {
+	return dro.db.Update(func(tx *wdb.Tx) error {
 		dro.op.Delete(tx)
 		return nil
 	})
@@ -133,7 +131,7 @@ func (dro *DeviceRemoveOperation) Finalize() error {
 	if id == "" {
 		return nil
 	}
-	return dro.db.Update(func(tx *bolt.Tx) error {
+	return dro.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		if e := markDeviceFailed(txdb, id, true); e != nil {
 			return e

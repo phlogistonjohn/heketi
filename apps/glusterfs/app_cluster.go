@@ -13,8 +13,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
 )
@@ -32,7 +33,7 @@ func (a *App) ClusterCreate(w http.ResponseWriter, r *http.Request) {
 	entry := NewClusterEntryFromRequest(&msg)
 
 	// Add cluster to db
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		err := entry.Save(tx)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -66,7 +67,7 @@ func (a *App) ClusterSetFlags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.db.Update(func(tx *bolt.Tx) error {
+	err = a.db.Update(func(tx *wdb.Tx) error {
 		entry, err := NewClusterEntryFromId(tx, id)
 		if err == ErrNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -100,7 +101,7 @@ func (a *App) ClusterList(w http.ResponseWriter, r *http.Request) {
 	var list api.ClusterListResponse
 
 	// Get all the cluster ids from the DB
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		var err error
 
 		list.Clusters, err = ClusterList(tx)
@@ -133,7 +134,7 @@ func (a *App) ClusterInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Get info from db
 	var info *api.ClusterInfoResponse
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 
 		// Create a db entry from the id
 		entry, err := NewClusterEntryFromId(tx, id)
@@ -177,7 +178,7 @@ func (a *App) ClusterDelete(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	// Delete cluster from db
-	err := a.db.Update(func(tx *bolt.Tx) error {
+	err := a.db.Update(func(tx *wdb.Tx) error {
 
 		// Access cluster entry
 		entry, err := NewClusterEntryFromId(tx, id)

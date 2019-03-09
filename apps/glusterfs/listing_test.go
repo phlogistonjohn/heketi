@@ -13,10 +13,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/heketi/heketi/pkg/glusterfs/api"
-
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
 func TestListCompleteVolumes(t *testing.T) {
@@ -44,7 +44,7 @@ func TestListCompleteVolumes(t *testing.T) {
 	err = vol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 1, "expected len(vols) == 1, got:", len(vols))
@@ -88,7 +88,7 @@ func TestListCompleteBlockVolumes(t *testing.T) {
 	err = vol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteBlockVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 1, "expected len(vols) == 1, got:", len(vols))
@@ -154,7 +154,7 @@ func TestListCompleteVolumesFakedPending(t *testing.T) {
 	err = vol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 1, "expected len(vols) == 1, got:", len(vols))
@@ -162,7 +162,7 @@ func TestListCompleteVolumesFakedPending(t *testing.T) {
 	})
 
 	// set up a fake pending op
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		vols, err := VolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		po := NewPendingOperationEntry(NEW_ID)
@@ -176,7 +176,7 @@ func TestListCompleteVolumesFakedPending(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 0, "expected len(vols) == 0, got:", len(vols))
@@ -207,7 +207,7 @@ func TestListCompleteBlockVolumesFakedPending(t *testing.T) {
 	err = vol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bvols, err := ListCompleteBlockVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(bvols) == 1, "expected len(bvols) == 1, got:", len(bvols))
@@ -215,7 +215,7 @@ func TestListCompleteBlockVolumesFakedPending(t *testing.T) {
 	})
 
 	// set up a fake pending op
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		bvols, err := BlockVolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		po := NewPendingOperationEntry(NEW_ID)
@@ -229,7 +229,7 @@ func TestListCompleteBlockVolumesFakedPending(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		bvols, err := ListCompleteBlockVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(bvols) == 0, "expected len(bvols) == 0, got:", len(bvols))
@@ -260,7 +260,7 @@ func TestUpdateVolumeInfoCompleteFakedPending(t *testing.T) {
 	err = bvol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 1, "expected len(vols) == 1, got:", len(vols))
@@ -271,7 +271,7 @@ func TestUpdateVolumeInfoCompleteFakedPending(t *testing.T) {
 	})
 
 	// set up fake pending ops
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		bvols, err := BlockVolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		po := NewPendingOperationEntry(NEW_ID)
@@ -285,7 +285,7 @@ func TestUpdateVolumeInfoCompleteFakedPending(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vids, err := VolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vids) == 1, "expected len(vids) == 1, got:", len(vids))
@@ -338,7 +338,7 @@ func TestUpdateClusterInfoCompleteFakedPending(t *testing.T) {
 	err = bvol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 2, "expected len(vols) == 2, got:", len(vols))
@@ -349,7 +349,7 @@ func TestUpdateClusterInfoCompleteFakedPending(t *testing.T) {
 	})
 
 	// set up fake pending ops
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		vols, err := VolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		po := NewPendingOperationEntry(NEW_ID)
@@ -374,7 +374,7 @@ func TestUpdateClusterInfoCompleteFakedPending(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		cids, err := ClusterList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(cids) == 1, "expected len(cids) == 1, got:", len(cids))
@@ -421,7 +421,7 @@ func TestListCompleteVolumesFakedPendingBlockHosting(t *testing.T) {
 	err = vol.Create(app.db, app.executor)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 1, "expected len(vols) == 1, got:", len(vols))
@@ -429,7 +429,7 @@ func TestListCompleteVolumesFakedPendingBlockHosting(t *testing.T) {
 	})
 
 	// set up a fake pending op
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		vols, err := VolumeList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		po := NewPendingOperationEntry(NEW_ID)
@@ -443,7 +443,7 @@ func TestListCompleteVolumesFakedPendingBlockHosting(t *testing.T) {
 		return nil
 	})
 
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		vols, err := ListCompleteVolumes(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(vols) == 0, "expected len(vols) == 0, got:", len(vols))

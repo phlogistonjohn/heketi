@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 )
@@ -140,7 +138,7 @@ func (hc *NodeHealthCache) Stop() {
 
 func (hc *NodeHealthCache) toProbe() ([]*NodeHealthStatus, error) {
 	probeNodes := []*NodeHealthStatus{}
-	err := hc.db.View(func(tx *bolt.Tx) error {
+	err := hc.db.View(func(tx *wdb.Tx) error {
 		n, err := NodeList(tx)
 		if err != nil {
 			return err

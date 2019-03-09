@@ -14,11 +14,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/boltdb/bolt"
+	"github.com/heketi/tests"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/heketi/tests"
 )
 
 func createSampleNodeEntry() *NodeEntry {
@@ -134,7 +135,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	n := NewNodeEntryFromRequest(req)
 
 	// Register node
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Register(tx)
 		tests.Assert(t, err == nil)
 
@@ -143,7 +144,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Should not be able to register again
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Register(tx)
 		tests.Assert(t, err != nil)
 
@@ -164,7 +165,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	diff_cluster_n := NewNodeEntryFromRequest(req)
 
 	// Should not be able to register diff_cluster_n
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return diff_cluster_n.Register(tx)
 	})
 	tests.Assert(t, err != nil)
@@ -181,7 +182,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	n2 := NewNodeEntryFromRequest(req)
 
 	// Register n2 node
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n2.Register(tx)
 		tests.Assert(t, err == nil)
 
@@ -190,7 +191,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Remove n
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Deregister(tx)
 		tests.Assert(t, err == nil)
 
@@ -199,7 +200,7 @@ func TestNodeEntryRegister(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Register n node again
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Register(tx)
 		tests.Assert(t, err == nil)
 
@@ -229,14 +230,14 @@ func TestNodeEntryRegisterStaleRegistration(t *testing.T) {
 	n := NewNodeEntryFromRequest(req)
 
 	// Only save the registration
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return n.Register(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Register node again.  This should
 	// work because a real node entry is not saved
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Register(tx)
 		tests.Assert(t, err == nil)
 
@@ -245,13 +246,13 @@ func TestNodeEntryRegisterStaleRegistration(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Register again.  Should not work
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return n.Register(tx)
 	})
 	tests.Assert(t, err != nil)
 
 	// Remove n
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Deregister(tx)
 		tests.Assert(t, err == nil)
 
@@ -260,7 +261,7 @@ func TestNodeEntryRegisterStaleRegistration(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Register n node again
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		err := n.Register(tx)
 		tests.Assert(t, err == nil)
 
@@ -279,7 +280,7 @@ func TestNewNodeEntryFromIdNotFound(t *testing.T) {
 	defer app.Close()
 
 	// Test for ID not found
-	err := app.db.View(func(tx *bolt.Tx) error {
+	err := app.db.View(func(tx *wdb.Tx) error {
 		_, err := NewNodeEntryFromId(tx, "123")
 		return err
 	})
@@ -310,13 +311,13 @@ func TestNewNodeEntryFromId(t *testing.T) {
 	n.DeviceAdd("def")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return n.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var node *NodeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
@@ -353,13 +354,13 @@ func TestNewNodeEntrySaveDelete(t *testing.T) {
 	n.DeviceAdd("def")
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return n.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var node *NodeEntry
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
@@ -372,7 +373,7 @@ func TestNewNodeEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, reflect.DeepEqual(node, n))
 
 	// Delete entry which has devices
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
@@ -393,13 +394,13 @@ func TestNewNodeEntrySaveDelete(t *testing.T) {
 	node.DeviceDelete("abc")
 	node.DeviceDelete("def")
 	tests.Assert(t, len(node.Devices) == 0)
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		return node.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	// Now try to delete the node
-	err = app.db.Update(func(tx *bolt.Tx) error {
+	err = app.db.Update(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
@@ -417,7 +418,7 @@ func TestNewNodeEntrySaveDelete(t *testing.T) {
 	tests.Assert(t, err == nil)
 
 	// Check node has been deleted and is not in db
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		var err error
 		node, err = NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
@@ -450,13 +451,13 @@ func TestNewNodeEntryNewInfoResponse(t *testing.T) {
 	n := NewNodeEntryFromRequest(req)
 
 	// Save element in database
-	err := app.db.Update(func(tx *bolt.Tx) error {
+	err := app.db.Update(func(tx *wdb.Tx) error {
 		return n.Save(tx)
 	})
 	tests.Assert(t, err == nil)
 
 	var info *api.NodeInfoResponse
-	err = app.db.View(func(tx *bolt.Tx) error {
+	err = app.db.View(func(tx *wdb.Tx) error {
 		node, err := NewNodeEntryFromId(tx, n.Info.Id)
 		if err != nil {
 			return err
@@ -513,7 +514,7 @@ func TestNodeSetStateFailed(t *testing.T) {
 	n.DeviceAdd(d.Info.Id)
 
 	// Save in db
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil)
 
@@ -584,7 +585,7 @@ func TestNodeSetStateOfflineOnline(t *testing.T) {
 	n.DeviceAdd(d.Info.Id)
 
 	// Save in db
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil)
 
@@ -638,7 +639,7 @@ func TestGetVerifiedManageHostname(t *testing.T) {
 	c.NodeAdd(n.Info.Id)
 
 	// Save in db
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		err := c.Save(tx)
 		tests.Assert(t, err == nil)
 
@@ -653,7 +654,7 @@ func TestGetVerifiedManageHostname(t *testing.T) {
 	tests.Assert(t, err == nil)
 	tests.Assert(t, n.State == api.EntryStateOnline)
 
-	app.db.Update(func(tx *bolt.Tx) error {
+	app.db.Update(func(tx *wdb.Tx) error {
 		// Set offline
 		n.State = api.EntryStateOffline
 		tests.Assert(t, n.State == api.EntryStateOffline)

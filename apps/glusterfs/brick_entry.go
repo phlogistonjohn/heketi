@@ -15,14 +15,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/paths"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 type BrickEntry struct {
@@ -43,7 +43,7 @@ type BrickEntry struct {
 	SubType BrickSubType
 }
 
-func BrickList(tx *bolt.Tx) ([]string, error) {
+func BrickList(tx *wdb.Tx) ([]string, error) {
 
 	list := EntryKeys(tx, BOLTDB_BUCKET_BRICK)
 	if list == nil {
@@ -81,7 +81,7 @@ func NewBrickEntry(size, tpsize, poolMetadataSize uint64,
 	return entry
 }
 
-func NewBrickEntryFromId(tx *bolt.Tx, id string) (*BrickEntry, error) {
+func NewBrickEntryFromId(tx *wdb.Tx, id string) (*BrickEntry, error) {
 	godbc.Require(tx != nil)
 
 	entry := &BrickEntry{}
@@ -93,7 +93,7 @@ func NewBrickEntryFromId(tx *bolt.Tx, id string) (*BrickEntry, error) {
 	return entry, nil
 }
 
-func CloneBrickEntryFromId(tx *bolt.Tx, id string) (*BrickEntry, error) {
+func CloneBrickEntryFromId(tx *wdb.Tx, id string) (*BrickEntry, error) {
 	godbc.Require(tx != nil)
 	godbc.Require(id != "")
 
@@ -127,18 +127,18 @@ func (b *BrickEntry) Id() string {
 	return b.Info.Id
 }
 
-func (b *BrickEntry) Save(tx *bolt.Tx) error {
+func (b *BrickEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(b.Info.Id) > 0)
 
 	return EntrySave(tx, b, b.Info.Id)
 }
 
-func (b *BrickEntry) Delete(tx *bolt.Tx) error {
+func (b *BrickEntry) Delete(tx *wdb.Tx) error {
 	return EntryDelete(tx, b, b.Info.Id)
 }
 
-func (b *BrickEntry) NewInfoResponse(tx *bolt.Tx) (*api.BrickInfo, error) {
+func (b *BrickEntry) NewInfoResponse(tx *wdb.Tx) (*api.BrickInfo, error) {
 	info := &api.BrickInfo{}
 	*info = b.Info
 
@@ -194,7 +194,7 @@ func (b *BrickEntry) brickRequest(path string, create bool) *executors.BrickRequ
 func (b *BrickEntry) host(db wdb.RODB) (string, error) {
 	// Get node hostname
 	var host string
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		node, err := NewNodeEntryFromId(tx, b.Info.NodeId)
 		if err != nil {
 			return err
@@ -263,7 +263,7 @@ func (b *BrickEntry) TotalSize() uint64 {
 	return b.TpSize + b.PoolMetadataSize
 }
 
-func BrickEntryUpgrade(tx *bolt.Tx) error {
+func BrickEntryUpgrade(tx *wdb.Tx) error {
 	err := addVolumeIdInBrickEntry(tx)
 	if err != nil {
 		return err
@@ -275,7 +275,7 @@ func BrickEntryUpgrade(tx *bolt.Tx) error {
 	return nil
 }
 
-func addVolumeIdInBrickEntry(tx *bolt.Tx) error {
+func addVolumeIdInBrickEntry(tx *wdb.Tx) error {
 	volumes, err := VolumeList(tx)
 	if err != nil {
 		return err
@@ -310,7 +310,7 @@ func addVolumeIdInBrickEntry(tx *bolt.Tx) error {
 	return nil
 }
 
-func addSubTypeFieldFlagForBrickEntry(tx *bolt.Tx) error {
+func addSubTypeFieldFlagForBrickEntry(tx *wdb.Tx) error {
 	entry, err := NewDbAttributeEntryFromKey(tx, DB_BRICK_HAS_SUBTYPE_FIELD)
 	// This key won't exist if we are introducing the feature now
 	if err != nil && err != ErrNotFound {
@@ -331,7 +331,7 @@ func (b *BrickEntry) UpdatePath() {
 	b.Info.Path = paths.BrickPath(b.Info.DeviceId, b.Info.Id)
 }
 
-func (b *BrickEntry) RemoveFromDevice(tx *bolt.Tx) error {
+func (b *BrickEntry) RemoveFromDevice(tx *wdb.Tx) error {
 	// Access device
 	device, err := NewDeviceEntryFromId(tx, b.Info.DeviceId)
 	if err != nil {
@@ -377,7 +377,7 @@ func (b *BrickEntry) BrickType() BrickSubType {
 }
 
 // remove deletes a brick and the links to that brick in the db.
-func (b *BrickEntry) remove(tx *bolt.Tx, v *VolumeEntry) error {
+func (b *BrickEntry) remove(tx *wdb.Tx, v *VolumeEntry) error {
 	err := b.RemoveFromDevice(tx)
 	if err != nil {
 		logger.Err(err)
@@ -404,7 +404,7 @@ func (b *BrickEntry) remove(tx *bolt.Tx, v *VolumeEntry) error {
 // removeAndFree deletes a brick and the links to that brick, as well
 // as updating the size counters on the associated device.
 func (b *BrickEntry) removeAndFree(
-	tx *bolt.Tx, v *VolumeEntry, reclaim bool) error {
+	tx *wdb.Tx, v *VolumeEntry, reclaim bool) error {
 
 	if err := b.remove(tx, v); err != nil {
 		return err

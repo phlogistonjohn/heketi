@@ -15,13 +15,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
 	"github.com/heketi/heketi/pkg/sortedstrings"
-	"github.com/lpabon/godbc"
 )
 
 type NodeEntry struct {
@@ -52,7 +52,7 @@ func NewNodeEntryFromRequest(req *api.NodeAddRequest) *NodeEntry {
 	return node
 }
 
-func NewNodeEntryFromId(tx *bolt.Tx, id string) (*NodeEntry, error) {
+func NewNodeEntryFromId(tx *wdb.Tx, id string) (*NodeEntry, error) {
 	godbc.Require(tx != nil)
 
 	entry := NewNodeEntry()
@@ -78,7 +78,7 @@ func GetVerifiedManageHostname(db wdb.RODB, e executors.Executor, clusterId stri
 	var cluster *ClusterEntry
 	var node *NodeEntry
 	var err error
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		var err error
 		cluster, err = NewClusterEntryFromId(tx, clusterId)
 		return err
@@ -90,7 +90,7 @@ func GetVerifiedManageHostname(db wdb.RODB, e executors.Executor, clusterId stri
 
 	for _, n := range cluster.Info.Nodes {
 		var newNode *NodeEntry
-		err = db.View(func(tx *bolt.Tx) error {
+		err = db.View(func(tx *wdb.Tx) error {
 			var err error
 			newNode, err = NewNodeEntryFromId(tx, n)
 			return err
@@ -120,7 +120,7 @@ func GetVerifiedManageHostname(db wdb.RODB, e executors.Executor, clusterId stri
 }
 
 // Returns Manage Hostname, given a Storage Hostname
-func GetManageHostnameFromStorageHostname(tx *bolt.Tx, shostname string) (string, error) {
+func GetManageHostnameFromStorageHostname(tx *wdb.Tx, shostname string) (string, error) {
 	godbc.Require(shostname != "")
 	var cluster *ClusterEntry
 	var node *NodeEntry
@@ -155,7 +155,7 @@ func GetManageHostnameFromStorageHostname(tx *bolt.Tx, shostname string) (string
 	return "", ErrNotFound
 }
 
-func (n *NodeEntry) Register(tx *bolt.Tx) error {
+func (n *NodeEntry) Register(tx *wdb.Tx) error {
 
 	// Save manage hostnames
 	for _, h := range n.Info.Hostnames.Manage {
@@ -210,7 +210,7 @@ func (n *NodeEntry) Register(tx *bolt.Tx) error {
 
 }
 
-func (n *NodeEntry) Deregister(tx *bolt.Tx) error {
+func (n *NodeEntry) Deregister(tx *wdb.Tx) error {
 
 	// Remove manage hostnames from Db
 	for _, h := range n.Info.Hostnames.Manage {
@@ -235,7 +235,7 @@ func (n *NodeEntry) BucketName() string {
 	return BOLTDB_BUCKET_NODE
 }
 
-func (n *NodeEntry) Save(tx *bolt.Tx) error {
+func (n *NodeEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(n.Info.Id) > 0)
 
@@ -269,7 +269,7 @@ func (n *NodeEntry) ConflictString() string {
 	return fmt.Sprintf("Unable to delete node [%v] because it contains devices", n.Info.Id)
 }
 
-func (n *NodeEntry) Delete(tx *bolt.Tx) error {
+func (n *NodeEntry) Delete(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 
 	// Check if the nodes still has drives
@@ -306,7 +306,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		case api.EntryStateOnline:
 			return nil
 		case api.EntryStateOffline:
-			err := db.Update(func(tx *bolt.Tx) error {
+			err := db.Update(func(tx *wdb.Tx) error {
 				// Save state
 				n.State = s
 				// Save new state
@@ -331,7 +331,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		case api.EntryStateOffline:
 			return nil
 		case api.EntryStateOnline:
-			err := db.Update(func(tx *bolt.Tx) error {
+			err := db.Update(func(tx *wdb.Tx) error {
 				n.State = s
 				err := n.Save(tx)
 				if err != nil {
@@ -345,7 +345,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		case api.EntryStateFailed:
 			for _, id := range n.Devices {
 				var d *DeviceEntry
-				err := db.View(func(tx *bolt.Tx) error {
+				err := db.View(func(tx *wdb.Tx) error {
 					var err error
 					d, err = NewDeviceEntryFromId(tx, id)
 					if err != nil {
@@ -363,7 +363,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 			}
 
 			// Make the state change to failed
-			err := db.Update(func(tx *bolt.Tx) error {
+			err := db.Update(func(tx *wdb.Tx) error {
 				n.State = s
 				err := n.Save(tx)
 				if err != nil {
@@ -382,7 +382,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 	return nil
 }
 
-func (n *NodeEntry) NewInfoReponse(tx *bolt.Tx) (*api.NodeInfoResponse, error) {
+func (n *NodeEntry) NewInfoReponse(tx *wdb.Tx) (*api.NodeInfoResponse, error) {
 
 	godbc.Require(tx != nil)
 
@@ -446,11 +446,11 @@ func (n *NodeEntry) DeviceDelete(id string) {
 	n.Devices = sortedstrings.Delete(n.Devices, id)
 }
 
-func NodeEntryUpgrade(tx *bolt.Tx) error {
+func NodeEntryUpgrade(tx *wdb.Tx) error {
 	return nil
 }
 
-func NodeList(tx *bolt.Tx) ([]string, error) {
+func NodeList(tx *wdb.Tx) ([]string, error) {
 
 	list := EntryKeys(tx, BOLTDB_BUCKET_NODE)
 	if list == nil {
@@ -459,7 +459,7 @@ func NodeList(tx *bolt.Tx) ([]string, error) {
 	return list, nil
 }
 
-func (n *NodeEntry) DeleteBricksWithEmptyPath(tx *bolt.Tx) error {
+func (n *NodeEntry) DeleteBricksWithEmptyPath(tx *wdb.Tx) error {
 
 	logger.Debug("Deleting bricks with empty path on node [%v].",
 		n.Info.Id)

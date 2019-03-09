@@ -15,8 +15,6 @@ import (
 
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-
-	"github.com/boltdb/bolt"
 )
 
 type OperationCleaner struct {
@@ -32,7 +30,7 @@ type OperationCleaner struct {
 func (oc OperationCleaner) Clean() error {
 	logger.Debug("Going to clean up operations")
 	var pops []*PendingOperationEntry
-	err := oc.db.View(func(tx *bolt.Tx) error {
+	err := oc.db.View(func(tx *wdb.Tx) error {
 		var err error
 		pops, err = PendingOperationEntrySelection(tx, oc.sel)
 		return err
@@ -125,7 +123,7 @@ func (oc OperationCleaner) MarkStale() error {
 		// operations must be new & older than 60 seconds to be selected
 		return p.Status == NewOperation && (now-p.Timestamp) >= 60
 	}
-	return oc.db.Update(func(tx *bolt.Tx) error {
+	return oc.db.Update(func(tx *wdb.Tx) error {
 		pops, err := PendingOperationEntrySelection(tx, sel)
 		if err != nil {
 			return err

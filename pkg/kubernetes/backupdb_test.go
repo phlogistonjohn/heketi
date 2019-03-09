@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	wdb "github.com/heketi/heketi/pkg/db"
 
 	"github.com/heketi/tests"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -198,7 +199,7 @@ func TestBackupToKubeSecretVerifyBackup(t *testing.T) {
 	}).Restore()
 
 	// Add some content to the db
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte("bucket"))
 		tests.Assert(t, err == nil)
 
@@ -239,7 +240,7 @@ func TestBackupToKubeSecretVerifyBackup(t *testing.T) {
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		bucket := tx.Bucket([]byte("bucket"))
 		tests.Assert(t, bucket != nil)
 
@@ -286,7 +287,7 @@ func TestBackupToKubeSecretVerifyBackupWithName(t *testing.T) {
 	}).Restore()
 
 	// Add some content to the db
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *wdb.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte("bucket"))
 		tests.Assert(t, err == nil)
 
@@ -327,7 +328,7 @@ func TestBackupToKubeSecretVerifyBackupWithName(t *testing.T) {
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
-	err = db.View(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *wdb.Tx) error {
 		bucket := tx.Bucket([]byte("bucket"))
 		tests.Assert(t, bucket != nil)
 

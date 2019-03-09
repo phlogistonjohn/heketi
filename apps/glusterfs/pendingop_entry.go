@@ -15,11 +15,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/lpabon/godbc"
+
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
-	"github.com/lpabon/godbc"
 )
 
 type OperationStatus string
@@ -52,7 +52,7 @@ type PendingOperationEntry struct {
 
 // PendingOperationList returns the IDs of all pending operation entries
 // currently in the Heketi db.
-func PendingOperationList(tx *bolt.Tx) ([]string, error) {
+func PendingOperationList(tx *wdb.Tx) ([]string, error) {
 	list := EntryKeys(tx, BOLTDB_BUCKET_PENDING_OPS)
 	if list == nil {
 		return nil, ErrAccessList
@@ -64,7 +64,7 @@ func PendingOperationList(tx *bolt.Tx) ([]string, error) {
 // operation entries. If the db cannot be read the function panics.
 func HasPendingOperations(db wdb.RODB) bool {
 	var pending bool
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *wdb.Tx) error {
 		l, err := PendingOperationList(tx)
 		if err != nil {
 			return err
@@ -102,7 +102,7 @@ func NewPendingOperationEntry(id string) *PendingOperationEntry {
 
 // NewPendingOperationEntryFromId fetches an existing pending operation entry
 // from the heketi db based on the provided id.
-func NewPendingOperationEntryFromId(tx *bolt.Tx, id string) (
+func NewPendingOperationEntryFromId(tx *wdb.Tx, id string) (
 	*PendingOperationEntry, error) {
 	godbc.Require(tx != nil)
 	godbc.Require(id != "")
@@ -122,7 +122,7 @@ func NewPendingOperationEntryFromId(tx *bolt.Tx, id string) (
 
 // Save records the pending operation entry object in the db, keyed by the
 // value of its ID.
-func (p *PendingOperationEntry) Save(tx *bolt.Tx) error {
+func (p *PendingOperationEntry) Save(tx *wdb.Tx) error {
 	godbc.Require(tx != nil)
 	godbc.Require(p.Id != "")
 	godbc.Require(p.Type != OperationUnknown)
@@ -131,7 +131,7 @@ func (p *PendingOperationEntry) Save(tx *bolt.Tx) error {
 }
 
 // Delete removes a pending operation entry from the db.
-func (p *PendingOperationEntry) Delete(tx *bolt.Tx) error {
+func (p *PendingOperationEntry) Delete(tx *wdb.Tx) error {
 	p.Reset()
 	return EntryDelete(tx, p, p.Id)
 }
@@ -302,7 +302,7 @@ func (p *PendingOperationEntry) ToInfo() api.PendingOperationInfo {
 
 // PendingOperationUpgrade updates the heketi db with metadata needed to
 // support pending operation entries.
-func PendingOperationUpgrade(tx *bolt.Tx) error {
+func PendingOperationUpgrade(tx *wdb.Tx) error {
 	entry, err := NewDbAttributeEntryFromKey(tx, DB_HAS_PENDING_OPS_BUCKET)
 	switch err {
 	case ErrNotFound:
@@ -322,7 +322,7 @@ func PendingOperationUpgrade(tx *bolt.Tx) error {
 
 // MarkPendingOperationsStale iterates through all the pending operations
 // in the DB and ensures they are marked as stale operations.
-func MarkPendingOperationsStale(tx *bolt.Tx) error {
+func MarkPendingOperationsStale(tx *wdb.Tx) error {
 	pops, err := PendingOperationList(tx)
 	if err != nil {
 		return err
@@ -343,7 +343,7 @@ func MarkPendingOperationsStale(tx *bolt.Tx) error {
 
 // PendingOperationStateCount returns a mapping of pending operation
 // statuses to the count of the operations of that status in the db.
-func PendingOperationStateCount(tx *bolt.Tx) (map[OperationStatus]int, error) {
+func PendingOperationStateCount(tx *wdb.Tx) (map[OperationStatus]int, error) {
 	pops, err := PendingOperationList(tx)
 	if err != nil {
 		return nil, err
@@ -362,7 +362,7 @@ func PendingOperationStateCount(tx *bolt.Tx) (map[OperationStatus]int, error) {
 // PendingOperationEntrySelection returns all pending operation entries in
 // the database that match the selection function `sel`.
 func PendingOperationEntrySelection(
-	tx *bolt.Tx,
+	tx *wdb.Tx,
 	sel func(*PendingOperationEntry) bool) ([]*PendingOperationEntry, error) {
 
 	selection := []*PendingOperationEntry{}

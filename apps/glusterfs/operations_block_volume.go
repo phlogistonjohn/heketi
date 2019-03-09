@@ -14,8 +14,6 @@ import (
 
 	"github.com/heketi/heketi/executors"
 	wdb "github.com/heketi/heketi/pkg/db"
-
-	"github.com/boltdb/bolt"
 )
 
 // BlockVolumeCreateOperation  implements the operation functions used to
@@ -78,7 +76,7 @@ func (bvc *BlockVolumeCreateOperation) ResourceUrl() string {
 // Build allocates and saves new volume and brick entries (tagged as pending)
 // in the db.
 func (bvc *BlockVolumeCreateOperation) Build() error {
-	return bvc.db.Update(func(tx *bolt.Tx) error {
+	return bvc.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		clusters, volumes, err := bvc.bvol.eligibleClustersAndVolumes(txdb)
 		if err != nil {
@@ -219,7 +217,7 @@ func (bvc *BlockVolumeCreateOperation) Exec(executor executors.Executor) error {
 
 // Finalize marks our new volume and brick db entries as no longer pending.
 func (bvc *BlockVolumeCreateOperation) Finalize() error {
-	return bvc.db.Update(func(tx *bolt.Tx) error {
+	return bvc.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		vol, brick_entries, err := bvc.volAndBricks(txdb)
 		if err != nil {
@@ -282,7 +280,7 @@ func (bvc *BlockVolumeCreateOperation) Clean(executor executors.Executor) error 
 	)
 	logger.Info("preparing to remove block volume %v in op:%v",
 		bvc.bvol.Info.Id, bvc.op.Id)
-	err = bvc.db.View(func(tx *bolt.Tx) error {
+	err = bvc.db.View(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		bv, err = NewBlockVolumeEntryFromId(tx, bvc.bvol.Info.Id)
 		if err != nil {
@@ -344,7 +342,7 @@ func (bvc *BlockVolumeCreateOperation) Clean(executor executors.Executor) error 
 
 func (bvc *BlockVolumeCreateOperation) CleanDone() error {
 	logger.Info("Clean is done for %v op:%v", bvc.Label(), bvc.op.Id)
-	return bvc.db.Update(func(tx *bolt.Tx) error {
+	return bvc.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		bv, err := NewBlockVolumeEntryFromId(tx, bvc.bvol.Info.Id)
 		if err != nil {
@@ -429,7 +427,7 @@ func (vdel *BlockVolumeDeleteOperation) ResourceUrl() string {
 // Build determines what volumes and bricks need to be deleted and
 // marks the db entries as such.
 func (vdel *BlockVolumeDeleteOperation) Build() error {
-	return vdel.db.Update(func(tx *bolt.Tx) error {
+	return vdel.db.Update(func(tx *wdb.Tx) error {
 		v, err := NewBlockVolumeEntryFromId(tx, vdel.bvol.Info.Id)
 		if err != nil {
 			return err
@@ -459,7 +457,7 @@ func (vdel *BlockVolumeDeleteOperation) Exec(executor executors.Executor) error 
 		hvname  string
 		bvHosts nodeHosts
 	)
-	err = vdel.db.View(func(tx *bolt.Tx) error {
+	err = vdel.db.View(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		bv, err = NewBlockVolumeEntryFromId(tx, vdel.bvol.Info.Id)
 		if err != nil {
@@ -492,7 +490,7 @@ func (vdel *BlockVolumeDeleteOperation) Rollback(executor executors.Executor) er
 	// currently rollback only removes the pending operation for delete block volume,
 	// leaving the db in the same state as it was before an exec failure.
 	// In the future we should make this operation resume-able
-	return vdel.db.Update(func(tx *bolt.Tx) error {
+	return vdel.db.Update(func(tx *wdb.Tx) error {
 		// REMINDER: Block volume delete and create are not symmetric in regards to
 		// removing vs. creating the block hosting volume
 		vdel.op.FinalizeBlockVolume(vdel.bvol)
@@ -508,7 +506,7 @@ func (vdel *BlockVolumeDeleteOperation) Rollback(executor executors.Executor) er
 // Finalize marks all brick and volume entries for this operation as
 // fully deleted.
 func (vdel *BlockVolumeDeleteOperation) Finalize() error {
-	return vdel.db.Update(func(tx *bolt.Tx) error {
+	return vdel.db.Update(func(tx *wdb.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		if e := vdel.bvol.removeComponents(txdb, false); e != nil {
 			logger.LogError("Failed to remove block volume from db")
@@ -540,7 +538,7 @@ func blockVolumesFromOp(db wdb.RODB,
 	op *PendingOperationEntry) ([]*BlockVolumeEntry, error) {
 
 	bvs := []*BlockVolumeEntry{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		for _, a := range op.Actions {
 			switch a.Change {
 			case OpAddBlockVolume, OpDeleteBlockVolume:
