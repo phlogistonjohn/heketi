@@ -10,8 +10,9 @@
 package glusterfs
 
 import (
-	"github.com/boltdb/bolt"
 	"github.com/lpabon/godbc"
+
+	wdb "github.com/heketi/heketi/pkg/db"
 )
 
 type DbEntry interface {
@@ -22,7 +23,7 @@ type DbEntry interface {
 
 // Checks if the key already exists in the database.  If it does not exist,
 // then it will save the key value pair in the database bucket.
-func EntryRegister(tx *bolt.Tx, entry DbEntry, key string, value []byte) ([]byte, error) {
+func EntryRegister(tx *wdb.Tx, entry DbEntry, key string, value []byte) ([]byte, error) {
 	godbc.Require(tx != nil)
 	godbc.Require(len(key) > 0)
 
@@ -50,7 +51,7 @@ func EntryRegister(tx *bolt.Tx, entry DbEntry, key string, value []byte) ([]byte
 	return nil, nil
 }
 
-func EntryKeys(tx *bolt.Tx, bucket string) []string {
+func EntryKeys(tx *wdb.Tx, bucket string) []string {
 	list := make([]string, 0)
 
 	// Get all the cluster ids from the DB
@@ -70,7 +71,7 @@ func EntryKeys(tx *bolt.Tx, bucket string) []string {
 	return list
 }
 
-func EntrySave(tx *bolt.Tx, entry DbEntry, key string) error {
+func EntrySave(tx *wdb.Tx, entry DbEntry, key string) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(key) > 0)
 
@@ -99,7 +100,7 @@ func EntrySave(tx *bolt.Tx, entry DbEntry, key string) error {
 	return nil
 }
 
-func EntryDelete(tx *bolt.Tx, entry DbEntry, key string) error {
+func EntryDelete(tx *wdb.Tx, entry DbEntry, key string) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(key) > 0)
 
@@ -121,7 +122,7 @@ func EntryDelete(tx *bolt.Tx, entry DbEntry, key string) error {
 	return nil
 }
 
-func EntryLoad(tx *bolt.Tx, entry DbEntry, key string) error {
+func EntryLoad(tx *wdb.Tx, entry DbEntry, key string) error {
 	godbc.Require(tx != nil)
 	godbc.Require(len(key) > 0)
 
