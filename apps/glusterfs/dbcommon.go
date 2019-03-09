@@ -12,8 +12,6 @@ package glusterfs
 import (
 	"time"
 
-	"github.com/boltdb/bolt"
-
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/idgen"
@@ -212,17 +210,17 @@ func recordNewDBGenerationID(tx *wdb.Tx) error {
 
 // OpenDB is a wrapper over bolt.Open. It takes a bool to decide whether it should be a read-only open.
 // Other bolt DB config options remain local to this function.
-func OpenDB(dbfilename string, ReadOnly bool) (dbhandle *bolt.DB, err error) {
+func OpenDB(dbfilename string, ReadOnly bool) (dbhandle *wdb.DBHandle, err error) {
 
 	if ReadOnly {
-		dbhandle, err = bolt.Open(dbfilename, 0666, &bolt.Options{ReadOnly: true})
+		dbhandle, err = wdb.Open(dbfilename, 0666, &wdb.Options{ReadOnly: true})
 		if err != nil {
 			logger.LogError("Unable to open database in read only mode: %v", err)
 		}
 		return dbhandle, err
 	}
 
-	dbhandle, err = bolt.Open(dbfilename, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	dbhandle, err = wdb.Open(dbfilename, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	if err != nil {
 		logger.LogError("Unable to open database: %v", err)
 	}
