@@ -18,7 +18,6 @@ import (
 	"os"
 	"testing"
 
-	//"github.com/boltdb/bolt"
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/tests"
 )
