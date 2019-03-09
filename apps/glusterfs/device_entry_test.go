@@ -16,7 +16,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
 	"github.com/heketi/heketi/executors"
@@ -771,7 +770,7 @@ func TestDeviceSetStateFailedTooFewDevices(t *testing.T) {
 		err.Error())
 }
 
-func mockVolumeInfoFromDb(db *bolt.DB, volume string) (*executors.Volume, error) {
+func mockVolumeInfoFromDb(db wdb.DB, volume string) (*executors.Volume, error) {
 	volume = volume[4:]
 	vi := &executors.Volume{}
 	db.View(func(tx *wdb.Tx) error {
@@ -797,7 +796,7 @@ func mockVolumeInfoFromDb(db *bolt.DB, volume string) (*executors.Volume, error)
 	return vi, nil
 }
 
-func mockHealStatusFromDb(db *bolt.DB, volume string) (*executors.HealInfo, error) {
+func mockHealStatusFromDb(db wdb.DB, volume string) (*executors.HealInfo, error) {
 	hi := &executors.HealInfo{}
 	volume = volume[4:]
 	db.View(func(tx *wdb.Tx) error {
