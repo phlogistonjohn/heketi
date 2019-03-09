@@ -15,13 +15,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boltdb/bolt"
-
 	wdb "github.com/heketi/heketi/pkg/db"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
-func dbDumpInternal(db wdb.DB) (Db, error) {
+func dbDumpInternal(db wdb.RODB) (Db, error) {
 	var dump Db
 	clusterEntryList := make(map[string]ClusterEntry, 0)
 	volEntryList := make(map[string]VolumeEntry, 0)
@@ -479,7 +477,7 @@ func DbCheck(dbfile string) error {
 
 // dbCheckConsistency ... checks the current db state to determine if contents
 // of all the buckets represent a consistent view.
-func dbCheckConsistency(db *bolt.DB) (response DbCheckResponse, err error) {
+func dbCheckConsistency(db wdb.RODB) (response DbCheckResponse, err error) {
 
 	dump, err := dbDumpInternal(db)
 	if err != nil {
