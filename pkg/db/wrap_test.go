@@ -31,14 +31,14 @@ func TestMinimalDBWrap(t *testing.T) {
 	tests.Assert(t, !w.readOnly, "expected w.readOnly to be false, got:", w.readOnly)
 
 	wasCalled := false
-	w.View(func(tx *bolt.Tx) error {
+	w.View(func(tx *Tx) error {
 		wasCalled = true
 		return nil
 	})
 	tests.Assert(t, wasCalled, "expected wasCalled to be true, got:", wasCalled)
 
 	wasCalled = false
-	w.Update(func(tx *bolt.Tx) error {
+	w.Update(func(tx *Tx) error {
 		wasCalled = true
 		return nil
 	})
@@ -151,7 +151,7 @@ func TestDBWrapPanicOnUpdateReadOnly(t *testing.T) {
 		e := recover()
 		tests.Assert(t, e != nil, "expected e != nil, got", e)
 	}()
-	w.Update(func(tx *bolt.Tx) error {
+	w.Update(func(tx *Tx) error {
 		t.Fatalf("should never get called")
 		return nil
 	})
@@ -162,11 +162,11 @@ type junkDB struct {
 	Foo int
 }
 
-func (j junkDB) View(func(tx *bolt.Tx) error) error {
+func (j junkDB) View(func(tx *Tx) error) error {
 	return nil
 }
 
-func (j junkDB) Update(func(tx *bolt.Tx) error) error {
+func (j junkDB) Update(func(tx *Tx) error) error {
 	return nil
 }
 
@@ -206,7 +206,7 @@ func TestTxWrapNestView(t *testing.T) {
 	// to use it within an existing transaction
 	f := func(db RODB) error {
 		stuff++
-		db.View(func(tx *bolt.Tx) error {
+		db.View(func(tx *Tx) error {
 			stuff++
 			return nil
 		})
@@ -214,7 +214,7 @@ func TestTxWrapNestView(t *testing.T) {
 		return nil
 	}
 
-	db.View(func(tx *bolt.Tx) error {
+	db.View(func(tx *Tx) error {
 		stuff++
 		f(WrapTxReadOnly(tx))
 		stuff++
@@ -238,7 +238,7 @@ func TestTxWrapNestUpdate(t *testing.T) {
 	// to use it within an existing transaction
 	f := func(db DB) error {
 		stuff++
-		db.Update(func(tx *bolt.Tx) error {
+		db.Update(func(tx *Tx) error {
 			stuff++
 			return nil
 		})
@@ -246,7 +246,7 @@ func TestTxWrapNestUpdate(t *testing.T) {
 		return nil
 	}
 
-	db.Update(func(tx *bolt.Tx) error {
+	db.Update(func(tx *Tx) error {
 		stuff++
 		f(WrapTx(tx))
 		stuff++
@@ -270,7 +270,7 @@ func TestTxWrapFailUpdateOnRO(t *testing.T) {
 	// to use it within an existing transaction
 	f := func(db DB) error {
 		stuff++
-		db.Update(func(tx *bolt.Tx) error {
+		db.Update(func(tx *Tx) error {
 			stuff++
 			return nil
 		})
@@ -287,7 +287,7 @@ func TestTxWrapFailUpdateOnRO(t *testing.T) {
 	// generally you would want to correctly use DB or RODB so that the type
 	// system can catch errors. However we have extra runtime guards against
 	// calling a write method on a R/O TxWrap.
-	db.Update(func(tx *bolt.Tx) error {
+	db.Update(func(tx *Tx) error {
 		stuff++
 		f(WrapTxReadOnly(tx))
 		stuff++
