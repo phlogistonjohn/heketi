@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/tests"
 
 	wdb "github.com/heketi/heketi/pkg/db"
@@ -39,7 +38,7 @@ func TestEntryRegister(t *testing.T) {
 	tmpfile := tests.Tempfile()
 
 	// Setup BoltDB database
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer os.Remove(tmpfile)
 
