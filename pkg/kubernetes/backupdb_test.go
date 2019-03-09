@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	wdb "github.com/heketi/heketi/pkg/db"
 
 	"github.com/heketi/tests"
@@ -33,7 +32,7 @@ func TestBackupToKubeSecretFailedClusterConfig(t *testing.T) {
 	defer os.Remove(tmpfile)
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
@@ -69,7 +68,7 @@ func TestBackupToKubeSecretFailedNewConfig(t *testing.T) {
 	defer os.Remove(tmpfile)
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
@@ -105,7 +104,7 @@ func TestBackupToKubeSecretFailedNamespace(t *testing.T) {
 	defer os.Remove(tmpfile)
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
@@ -140,7 +139,7 @@ func TestBackupToKubeSecretGoodBackup(t *testing.T) {
 	defer os.Remove(tmpfile)
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
@@ -175,7 +174,7 @@ func TestBackupToKubeSecretVerifyBackup(t *testing.T) {
 	defer os.Remove(tmpfile)
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 
 	incluster_count := 0
@@ -236,7 +235,7 @@ func TestBackupToKubeSecretVerifyBackup(t *testing.T) {
 
 	// Load new app with backup
 	db.Close()
-	db, err = bolt.Open(newdb, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err = wdb.Open(newdb, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
@@ -263,7 +262,7 @@ func TestBackupToKubeSecretVerifyBackupWithName(t *testing.T) {
 	defer os.Unsetenv("HEKETI_KUBE_DB_SECRET_NAME")
 
 	// Create a db
-	db, err := bolt.Open(tmpfile, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err := wdb.Open(tmpfile, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 
 	incluster_count := 0
@@ -324,7 +323,7 @@ func TestBackupToKubeSecretVerifyBackupWithName(t *testing.T) {
 
 	// Load new app with backup
 	db.Close()
-	db, err = bolt.Open(newdb, 0600, &bolt.Options{Timeout: 3 * time.Second})
+	db, err = wdb.Open(newdb, 0600, &wdb.Options{Timeout: 3 * time.Second})
 	tests.Assert(t, err == nil)
 	defer db.Close()
 
