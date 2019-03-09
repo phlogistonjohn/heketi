@@ -15,17 +15,22 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+// alias bolt types to isolate all db library functions to this
+// package
+
+type Tx = bolt.Tx
+
 // RODB provides an abstraction for all types of db connection that
 // support Read-Only transactions.
 type RODB interface {
-	View(func(*bolt.Tx) error) error
+	View(func(*Tx) error) error
 }
 
 // DB provides an abstraction for all types of db connection that
 // support both read and write transactions.
 type DB interface {
 	RODB
-	Update(func(*bolt.Tx) error) error
+	Update(func(*Tx) error) error
 }
 
 // DBWrap encapsulates a bolt DB object in a minimal interface
@@ -41,19 +46,19 @@ func NewDBWrap(db *bolt.DB) *DBWrap {
 }
 
 // View wraps a read-only transaction.
-func (w *DBWrap) View(cb func(*bolt.Tx) error) error {
-	return w.db.View(func(tx *bolt.Tx) error {
+func (w *DBWrap) View(cb func(*Tx) error) error {
+	return w.db.View(func(tx *Tx) error {
 		return cb(tx)
 	})
 }
 
 // Update wraps a read-write transaction.
 // If Update is called on a read-only DBWrap it panics.
-func (w *DBWrap) Update(cb func(*bolt.Tx) error) error {
+func (w *DBWrap) Update(cb func(*Tx) error) error {
 	if w.readOnly {
 		panic(errors.New("Can not update a read-only DBWrap"))
 	}
-	return w.db.Update(func(tx *bolt.Tx) error {
+	return w.db.Update(func(tx *Tx) error {
 		return cb(tx)
 	})
 }
@@ -68,19 +73,19 @@ func (w *DBWrap) ReadOnly() *DBWrap {
 // the RODB and DB interfaces. This is useful when defining a function
 // that can be used inside a transcation or start a transcation.
 type TxWrap struct {
-	tx       *bolt.Tx
+	tx       *Tx
 	readOnly bool
 }
 
 // View fakes a read-only transaction. The function signature of a read-only
 // transaction is supported but no new transaction is started.
-func (w *TxWrap) View(cb func(*bolt.Tx) error) error {
+func (w *TxWrap) View(cb func(*Tx) error) error {
 	return cb(w.tx)
 }
 
 // Update fakes a read-write transaction. The function signature of a read-write
 // transaction is supported but no new transaction is started.
-func (w *TxWrap) Update(cb func(*bolt.Tx) error) error {
+func (w *TxWrap) Update(cb func(*Tx) error) error {
 	if w.readOnly {
 		panic(errors.New("Can not update a read-only TxWrap"))
 	}
@@ -126,7 +131,7 @@ func WrapReadOnly(db DB) *DBWrap {
 // WrapTx takes a bolt db transaction object and return a TxWrap object.
 // This new object can now be used where the DB or RODB interfaces are
 // used without starting a new transaction.
-func WrapTx(tx *bolt.Tx) *TxWrap {
+func WrapTx(tx *Tx) *TxWrap {
 	return &TxWrap{tx, false}
 }
 
@@ -134,6 +139,6 @@ func WrapTx(tx *bolt.Tx) *TxWrap {
 // This new object can now be used where the DB or RODB interfaces are
 // used without starting a new transaction.
 // This wrapper will panic is .Update is called at runtime.
-func WrapTxReadOnly(tx *bolt.Tx) *TxWrap {
+func WrapTxReadOnly(tx *Tx) *TxWrap {
 	return &TxWrap{tx, true}
 }
