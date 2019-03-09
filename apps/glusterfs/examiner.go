@@ -14,8 +14,8 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/boltdb/bolt"
 	"github.com/heketi/heketi/executors"
+	wdb "github.com/heketi/heketi/pkg/db"
 )
 
 type ExaminerMode string
@@ -26,7 +26,7 @@ const (
 )
 
 type Examiner struct {
-	db        *bolt.DB
+	db        wdb.DB
 	executor  executors.Executor
 	optracker *OpTracker
 	mode      ExaminerMode
