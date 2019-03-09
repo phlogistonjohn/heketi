@@ -15,10 +15,7 @@ import (
 	"os"
 	"testing"
 
-	//"github.com/boltdb/bolt"
 	g "github.com/heketi/heketi/apps/glusterfs"
-	//"github.com/heketi/heketi/pkg/glusterfs/api"
-	//"github.com/heketi/tests"
 )
 
 func TestSimpleCluster(t *testing.T) {
