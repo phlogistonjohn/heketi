@@ -15,11 +15,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
-	client "github.com/heketi/heketi/client/api/go-client"
-	"github.com/heketi/heketi/pkg/logging"
 	"github.com/heketi/tests"
+
+	client "github.com/heketi/heketi/client/api/go-client"
+	wdb "github.com/heketi/heketi/pkg/db"
+	"github.com/heketi/heketi/pkg/logging"
 )
 
 func TestAppAdvsettings(t *testing.T) {
@@ -129,7 +130,7 @@ func TestAppReadOnlyDb(t *testing.T) {
 
 	// Now open it again here.  This will force NewApp()
 	// to be unable to open RW.
-	db, err := bolt.Open(dbfile, 0666, &bolt.Options{
+	db, err := wdb.Open(dbfile, 0666, &wdb.Options{
 		ReadOnly: true,
 	})
 	tests.Assert(t, err == nil, err)
