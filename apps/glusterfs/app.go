@@ -17,7 +17,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
 	"github.com/lpabon/godbc"
 
@@ -75,7 +74,7 @@ var (
 
 type App struct {
 	asyncManager *rest.AsyncHttpManager
-	db           *bolt.DB
+	db           *wdb.DBHandle
 	dbReadOnly   bool
 	executor     executors.Executor
 	_allocator   Allocator
