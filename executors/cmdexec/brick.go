@@ -61,13 +61,18 @@ func (s *CmdExecutor) BrickCreate(host string,
 	} else {
 		mkfsXfs = fmt.Sprintf("mkfs.xfs -i %v -d su=%v,sw=%v -n size=8192 %v", xfsInodeOptions, xfsSu, xfsSw, devnode)
 	}
-	commands := []string{
 
-		// Create a directory
-		fmt.Sprintf("mkdir -p %v", mountPath),
-
-		// Setup the LV
-		fmt.Sprintf("lvcreate -qq --autobackup=%v --poolmetadatasize %vK --chunksize %v --size %vK --thin %v/%v --virtualsize %vK --name %v",
+	var createBrickLv string
+	if true {
+		createBrickLv = fmt.Sprintf(
+			"lvcreate -qq --autobackup=%v --size %vK --name %v %v",
+			conv.BoolToYN(s.BackupLVM),
+			brick.TpSize,
+			brick.LvName,
+			paths.VgIdToName(brick.VgId))
+	} else {
+		createBrickLv = fmt.Sprintf(
+			"lvcreate -qq --autobackup=%v --poolmetadatasize %vK --chunksize %v --size %vK --thin %v/%v --virtualsize %vK --name %v",
 			// backup LVM metadata
 			conv.BoolToYN(s.BackupLVM),
 
@@ -90,7 +95,16 @@ func (s *CmdExecutor) BrickCreate(host string,
 			brick.Size,
 
 			// Logical Vol name
-			brick.LvName),
+			brick.LvName)
+	}
+
+	commands := []string{
+
+		// Create a directory
+		fmt.Sprintf("mkdir -p %v", mountPath),
+
+		// Setup the LV
+		createBrickLv,
 
 		// Format
 		mkfsXfs,
