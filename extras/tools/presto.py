@@ -2,8 +2,8 @@
 import argparse
 import copy
 import json
-import pprint
 import logging
+import pprint
 import sys
 import yaml
 
