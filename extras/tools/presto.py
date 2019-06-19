@@ -1,9 +1,11 @@
 
+import argparse
 import copy
 import json
 import pprint
 import logging
 import sys
+import yaml
 
 LF = '%(asctime)s: %(levelname)s: %(message)s'
 log = logging.getLogger('presto')
@@ -86,6 +88,14 @@ class Brick(object):
 
     def __repr__(self):
         return 'Brick'+repr(vars(self))
+
+
+def brick_path_id(bp):
+    segments = bp.split('/')
+    for s in segments:
+        if s.startswith('brick_'):
+            return s[6:]
+    raise ValueError(bp)
 
 
 def brick_from_path(hdata, bp):
@@ -215,56 +225,53 @@ def parse_lv_json(*jfiles):
     return lv
 
 
-def load():
-    hdata = parse_heketi(sys.argv[1])
-
-    volumes = [
-        Volume(
-            vol_id='979c4584d2f7d263f3d5cf520eccd1c7',
-            name='vol_979c4584d2f7d263f3d5cf520eccd1c7',
-            cluster='44f689a535da8673f1361633f430ee10',
-            size=20,
-            gid=2009,
-            bricks=[
-                brick_from_path(hdata, '192.168.52.195:/var/lib/heketi/mounts/vg_e5f063fc30c3320d6598a10f824282b1/brick_8835c5971575db25a4d54a6ff05178a4/brick'),
-                brick_from_path(hdata, '192.168.52.196:/var/lib/heketi/mounts/vg_542ebeec2fc1d191924d79879d638d90/brick_f6095807ed53a04cdd479a6bf2ae9571/brick'),
-                brick_from_path(hdata, '192.168.52.197:/var/lib/heketi/mounts/vg_0c42561fb3c34471f3ea0d637a7a9f6b/brick_45b13d48ca584d8b860af3481131252a/brick'),
-            ]),
-        Volume(
-            vol_id='d384b555d3854d2a97b02bd2e620dfdc',
-            name='vol_d384b555d3854d2a97b02bd2e620dfdc',
-            cluster='44f689a535da8673f1361633f430ee10',
-            size=10,
-            gid=2009,
-            bricks=[
-                brick_from_path(hdata, "192.168.52.196:/var/lib/heketi/mounts/vg_7acfa408ae9ecf7b6ca3cbfe46be64f8/brick_d2e7dc203a4d354806a9d3cb5b3e15f3/brick"),
-                brick_from_path(hdata, "192.168.52.197:/var/lib/heketi/mounts/vg_4dc082d54055dcb4f31646a9e154a988/brick_b056476bfa9c736418b607a3af7fd686/brick"),
-                brick_from_path(hdata, "192.168.52.195:/var/lib/heketi/mounts/vg_e5f063fc30c3320d6598a10f824282b1/brick_f3db89a97305c94177321ffdeda89b95/brick"),
-            ]),
-    ]
-    for v in volumes:
-        v.update()
-    return hdata, volumes
+def parse_oshift(yf):
+    with open(yf) as fh:
+        return yaml.safe_load(fh)
 
 
-def fixup(hdata, new_vols):
-    for v in new_vols:
+def pv_vol_map(pvdata):
+    m = {}
+    for entry in pvdata['items']:
+        try:
+            key = entry['spec']['glusterfs']['path']
+        except KeyError:
+            continue
+        log.debug("Found gluster volume in pv: %s", key)
+        m[key] = entry
+    return m
+
+
+def restore_volumes(hdata, gvinfo, pvdata, lvdata, vols):
+    pvmap = pv_vol_map(pvdata)
+
+    if len(hdata['clusterentries']) > 1:
+        raise ValueError("currently requires one cluster in heketi")
+    cluster_id = list(hdata['clusterentries'].keys())[0]
+
+    for volname in vols:
+        pv = pvmap[volname]
+        try:
+            vol_id = pv['metadata']['annotations']['gluster.kubernetes.io/heketi-volume-id']
+        except KeyError:
+            log.error("did not find volume id for volume: %s", volname)
+            raise
+        v = Volume(
+            vol_id=vol_id,
+            name=volname,
+            cluster=cluster_id,
+            size=int(pv['spec']['capacity']['storage'].replace("Gi", "")),
+            gid=int(pv['metadata']['annotations'].get("pv.beta.kubernetes.io/gid", 0)),
+            bricks=[])
+
         hdata['volumeentries'][v.vol_id] = v.expand()
         hdata['clusterentries'][v.cluster]['Info']['volumes'].append(v.vol_id)
         for b in v.bricks:
             hdata['brickentries'][b.brick_id] = b.expand()
             hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
-    return hdata
 
 
-def fixup2():
-    log.info("Reading heketi data ...")
-    hdata = parse_heketi(sys.argv[1])
-    log.info("Reading gluster data ...")
-    gvinfo = parse_gvinfo(sys.argv[2])
-    lvinfo = parse_lv_json(*sys.argv[3:])
-
-    vlist = hdata['volumeentries'].keys()
+def restore_bricks(hdata, gvinfo, pvdata, lvinfo):
 
     lvmap = {}
     diffcount = 0
@@ -277,29 +284,40 @@ def fixup2():
                 diffcount += 1
     log.info('differing lv brick id / pool id count = %s', diffcount)
 
-
-    for vid in vlist:
+    for vid in hdata['volumeentries'].keys():
+        log.debug("Checking %s for missing bricks", vid)
         name = hdata['volumeentries'][vid]['Info']['name']
-        # TODO: check num of bricks in db vs gluster
         snap_factor = hdata['volumeentries'][vid]['Info']['snapshot']['factor']
         if snap_factor != 1:
             raise ValueError('can only handle snap_factor=1')
-        missing_bricks = []
+        missing_bricks = set()
+        try:
+            gvol = gvinfo[name]
+        except KeyError:
+            log.error(
+                "No entry for volume %s in gluster volume info, skipping",
+                name)
+            continue
+        for bpath in gvol:
+            bid = brick_path_id(bpath)
+            if bid not in hdata['volumeentries'][vid]['Bricks']:
+                missing_bricks.add(bid)
         for bid in hdata['volumeentries'][vid]['Bricks']:
             if bid not in hdata['brickentries']:
-                missing_bricks.append(bid)
+                missing_bricks.add(bid)
         if not missing_bricks:
+            log.info("No missing bricks for %s", vid)
             continue
+        log.info("Missing bricks for volume %s", vid)
         if hdata['volumeentries'][vid]['Pending'].get('Id'):
             raise ValueError('volume %r is pending' % vid)
-        log.info("Missing bricks: %r", missing_bricks)
-        gvol = gvinfo[name]
+        log.info("Missing bricks: %r", sorted(missing_bricks))
         vsize = hdata['volumeentries'][vid]['Info']['size']
         if vid == '2b3de9aad17fffef443c4d1215d30315':
             vsize = int(vsize / 4)
         log.info('Using gluster info: %r', gvol)
         for bpath in gvol:
-            if not any(bid in bpath for bid in missing_bricks):
+            if not any(bid in bpath for bid in sorted(missing_bricks)):
                 continue
             log.info('Attempting to restore brick %s', bpath)
             b = brick_from_path(hdata, bpath)
@@ -308,19 +326,53 @@ def fixup2():
                 vol_size=vsize,
                 tp_name=lvmap.get('brick_{}'.format(b.brick_id), ''))
             hdata['brickentries'][b.brick_id] = b.expand()
+            if b.brick_id not in hdata['volumeentries'][vid]['Bricks']:
+                log.info('Adding brick id %r to volume %r',
+                         b.brick_id, vid)
+                hdata['volumeentries'][vid]['Bricks'].append(b.brick_id)
             if b.brick_id not in hdata['deviceentries'][b.device_id]['Bricks']:
                 log.info('Adding brick id %r to device %r',
                          b.brick_id, b.device_id)
                 hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
-
-
     return hdata
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--gluster-info', '-g',
+        help='Path to a file containing gluster volume info')
+    parser.add_argument(
+        '--heketi-json', '-j',
+        help='Path to a file containing Heketi db json export')
+    parser.add_argument(
+        '--pv-yaml', '-y',
+        help='Path to a file containing PV yaml data')
+    parser.add_argument(
+        '--lvs-json', '-l', action='append',
+        help='LVM LVs json')
+    parser.add_argument(
+        '--volume', '-V', action='append',
+        help='Restore volume with given id & name')
+    args = parser.parse_args()
+
+    log.info("Reading heketi data ...")
+    hdata = parse_heketi(args.heketi_json)
+    log.info("Reading gluster data ...")
+    gvinfo = parse_gvinfo(args.gluster_info)
+    log.info("Reading PV yaml ...")
+    pvdata = parse_oshift(args.pv_yaml)
+    log.info("Reading lvs json ...")
+    lvdata = parse_lv_json(*args.lvs_json)
+    if args.volume:
+        restore_volumes(hdata, gvinfo, pvdata, lvdata, args.volume)
+    restore_bricks(hdata, gvinfo, pvdata, lvdata)
+    json.dump(hdata, sys.stdout, indent=4)
+
 
 if __name__ == '__main__':
     logging.basicConfig(
         stream=sys.stderr,
         format=LF,
         level=logging.DEBUG)
-
-    j = fixup2()
-    json.dump(j, sys.stdout, indent=4)
+    main()
