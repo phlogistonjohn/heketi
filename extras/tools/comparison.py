@@ -217,6 +217,10 @@ def compile_pvdata(summary, pvdata, matchsc):
         if not g and 'glusterBlockShare' not in ma:
             continue
         sc = elem.get('spec', {}).get('storageClassName', '')
+        if matchsc and sc not in matchsc:
+            sys.stderr.write(
+                'ignoring: {} from storage class "{}"\n'.format(g.get("path", ""), sc))
+            continue
         if 'path' in g:
             vn = g['path']
             block = False
