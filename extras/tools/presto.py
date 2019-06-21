@@ -118,11 +118,14 @@ def brick_from_path(hdata, bp):
 PMD_TABLE = {
     1: 8192,
     2: 12288,
+    3: 16384,
     5: 28672,
+    8: 45056,
     10: 53248,
     15: 81920,
     20: 106496,
     25: 131072,
+    45: 237568,
     50: 262144,
     80: 421888,
     100: 524288,
@@ -150,13 +153,13 @@ VOL_STUB = {
         "mount": {
             "glusterfs": {
                 "hosts": [
-                    "192.168.52.196",
-                    "192.168.52.197",
-                    "192.168.52.195"
+                    "10.47.60.18",
+                    "10.47.60.20",
+                    "10.47.60.19"
                 ],
-                "device": "192.168.52.196:{name}",
+                "device": "10.47.60.18:{name}",
                 "options": {
-                    "backup-volfile-servers": "192.168.52.197,192.168.52.195"
+                    "backup-volfile-servers": "10.47.60.20,10.47.60.19"
                 }
             }
         },
@@ -165,8 +168,6 @@ VOL_STUB = {
     "Bricks": [
     ],
     "GlusterVolumeOptions": [
-        "server.tcp-user-timeout 42",
-        ""
     ],
     "Pending": {
         "Id": ""
@@ -363,7 +364,7 @@ def main():
     log.info("Reading PV yaml ...")
     pvdata = parse_oshift(args.pv_yaml)
     log.info("Reading lvs json ...")
-    lvdata = parse_lv_json(*args.lvs_json)
+    lvdata = parse_lv_json(*(args.lvs_json or []))
     if args.volume:
         restore_volumes(hdata, gvinfo, pvdata, lvdata, args.volume)
     restore_bricks(hdata, gvinfo, pvdata, lvdata)
