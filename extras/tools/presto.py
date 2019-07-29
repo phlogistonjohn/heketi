@@ -98,20 +98,48 @@ def brick_path_id(bp):
     raise ValueError(bp)
 
 
-def brick_from_path(hdata, bp):
-    b = Brick()
+def brick_path_info(bp):
+    ip = device_id = brick_id = None
     ip, bp = bp.split(':')
     parts = bp.split('/')
     for part in parts:
         if part.startswith('vg_'):
-            b.device_id = part[3:]
+            device_id = part[3:]
         if part.startswith('brick_'):
-            b.brick_id = part[6:]
+            brick_id = part[6:]
+    return ip, device_id, brick_id
 
+
+def node_id_from_ip(hdata, ip):
+    node_id = None
     for n in hdata['nodeentries'].values():
         hn = n['Info']['hostnames']
         if ip in hn['storage'] or ip in hn['manage']:
-            b.node_id = n["Info"]["id"]
+            node_id = n["Info"]["id"]
+    return node_id
+
+
+def brick_from_path(hdata, bp):
+    b = Brick()
+    ip, device_id, brick_id = brick_path_info(bp)
+    b.device_id = device_id
+    b.brick_id = brick_id
+    b.node_id = node_id_from_ip(hdata, ip)
+    return b
+
+
+def brick_from_brick(hdata, old_id, bp):
+    b = Brick()
+    orig = hdata['brickentries'][old_id]
+    new_ip, new_device_id, new_id = brick_path_info(bp)
+    b.brick_id = new_id
+    b.device_id = new_device_id
+    b.node_id = node_id_from_ip(hdata, new_ip)
+    b.size = orig['Info']['size']
+    b.tp_size = orig['TpSize']
+    b.pmd_size = orig['PoolMetadataSize']
+    b.tp_name = ''
+    b.vol_id = orig['Info']['volume']
     return b
 
 
@@ -231,6 +259,18 @@ def parse_oshift(yf):
         return yaml.safe_load(fh)
 
 
+def parse_brick_swap(bsfile):
+    bswap = {}
+    with open(bsfile) as fh:
+        for line in fh:
+            l = line.strip()
+            if not l or l.startswith('#'):
+                continue
+            nbrick, obrick = l.split()
+            bswap[nbrick] = obrick
+    return bswap
+
+
 def pv_vol_map(pvdata):
     m = {}
     for entry in pvdata['items']:
@@ -272,7 +312,7 @@ def restore_volumes(hdata, gvinfo, pvdata, lvdata, vols):
             hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
 
 
-def restore_bricks(hdata, gvinfo, pvdata, lvinfo):
+def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap):
 
     lvmap = {}
     diffcount = 0
@@ -321,7 +361,12 @@ def restore_bricks(hdata, gvinfo, pvdata, lvinfo):
             if not any(bid in bpath for bid in sorted(missing_bricks)):
                 continue
             log.info('Attempting to restore brick %s', bpath)
-            b = brick_from_path(hdata, bpath)
+            _, _, brick_id = brick_path_info(bpath)
+            if brick_id in brick_swap:
+                log.info("Sourcing brick settings from %s", brick_swap[brick_id])
+                b = brick_from_brick(hdata, brick_swap[brick_id], bpath)
+            else:
+                b = brick_from_path(hdata, bpath)
             b.update(
                 vol_id=vid,
                 vol_size=vsize,
@@ -336,6 +381,17 @@ def restore_bricks(hdata, gvinfo, pvdata, lvinfo):
                          b.brick_id, b.device_id)
                 hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
     return hdata
+
+
+def trim_bricks(hdata, brick_ids):
+    for brick_id in brick_ids:
+        del hdata['brickentries'][brick_id]
+        for v in hdata['volumeentries'].values():
+            if brick_id in v['Bricks']:
+                v['Bricks'].remove(brick_id)
+        for d in hdata['deviceentries'].values():
+            if brick_id in d['Bricks']:
+                d['Bricks'].remove(brick_id)
 
 
 def main():
@@ -355,19 +411,35 @@ def main():
     parser.add_argument(
         '--volume', '-V', action='append',
         help='Restore volume with given id & name')
+    parser.add_argument(
+        '--brick-swap', '-b',
+        help='Brick id to brick id mapping for brick replacement')
+    parser.add_argument(
+        '--trim-swapped-bricks', '-T', action='store_true',
+        help='Trim swapped source bricks from db')
     args = parser.parse_args()
 
     log.info("Reading heketi data ...")
     hdata = parse_heketi(args.heketi_json)
     log.info("Reading gluster data ...")
     gvinfo = parse_gvinfo(args.gluster_info)
-    log.info("Reading PV yaml ...")
-    pvdata = parse_oshift(args.pv_yaml)
+    if args.pv_yaml:
+        log.info("Reading PV yaml ...")
+        pvdata = parse_oshift(args.pv_yaml)
+    else:
+        pvdata = {"items": []}
     log.info("Reading lvs json ...")
     lvdata = parse_lv_json(*(args.lvs_json or []))
+    if args.brick_swap:
+        log.info("Reading brick swap...")
+        brick_swap = parse_brick_swap(args.brick_swap)
+    else:
+        brick_swap = {}
     if args.volume:
         restore_volumes(hdata, gvinfo, pvdata, lvdata, args.volume)
-    restore_bricks(hdata, gvinfo, pvdata, lvdata)
+    restore_bricks(hdata, gvinfo, pvdata, lvdata, brick_swap)
+    if args.trim_swapped_bricks:
+        trim_bricks(hdata, brick_swap.values())
     json.dump(hdata, sys.stdout, indent=4)
 
 
