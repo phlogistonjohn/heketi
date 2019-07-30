@@ -312,7 +312,7 @@ def restore_volumes(hdata, gvinfo, pvdata, lvdata, vols):
             hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
 
 
-def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap):
+def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap, increase_usage=True):
 
     lvmap = {}
     diffcount = 0
@@ -380,18 +380,28 @@ def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap):
                 log.info('Adding brick id %r to device %r',
                          b.brick_id, b.device_id)
                 hdata['deviceentries'][b.device_id]['Bricks'].append(b.brick_id)
+                if increase_usage:
+                    d = hdata['deviceentries'][b.device_id]
+                    bsize = b.tp_size + b.pmd_size
+                    d["Info"]["storage"]["free"] -= bsize
+                    d["Info"]["storage"]["used"] += bsize
     return hdata
 
 
-def trim_bricks(hdata, brick_ids):
+def trim_bricks(hdata, brick_ids, reduce_usage=True):
     for brick_id in brick_ids:
-        del hdata['brickentries'][brick_id]
+        b = hdata['brickentries'].pop(brick_id)
         for v in hdata['volumeentries'].values():
             if brick_id in v['Bricks']:
                 v['Bricks'].remove(brick_id)
         for d in hdata['deviceentries'].values():
             if brick_id in d['Bricks']:
                 d['Bricks'].remove(brick_id)
+                if reduce_usage:
+                    bsize = b["TpSize"] + b["PoolMetadataSize"]
+                    d["Info"]["storage"]["free"] += bsize
+                    d["Info"]["storage"]["used"] -= bsize
+    return hdata
 
 
 def main():
