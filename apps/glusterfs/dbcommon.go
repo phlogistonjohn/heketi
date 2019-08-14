@@ -360,7 +360,7 @@ func fixBlockHostingReservedSize(tx *wdb.Tx) error {
 // indicate that this db support extra identifying metadata on device
 // entries. It primarily exists as a guard against old versions of
 // heketi trying to access new dbs and ignoring the new metadata.
-func upgradeDeviceEntryMetaSupport(tx *bolt.Tx) error {
+func upgradeDeviceEntryMetaSupport(tx *wdb.Tx) error {
 	_, err := NewDbAttributeEntryFromKey(tx, DB_DEVICE_HAS_ID_META)
 	switch err {
 	case ErrNotFound:

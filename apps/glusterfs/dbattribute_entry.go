@@ -94,7 +94,7 @@ func DbAttributeList(tx *wdb.Tx) ([]string, error) {
 
 // validDbAttributeKeys returns true if all dbattribute keys in the
 // database match keys in knownKeys map.
-func validDbAttributeKeys(tx *bolt.Tx, knownKeys map[string]bool) bool {
+func validDbAttributeKeys(tx *wdb.Tx, knownKeys map[string]bool) bool {
 	list := EntryKeys(tx, BOLTDB_BUCKET_DBATTRIBUTE)
 	if list == nil {
 		logger.LogError("unable to list keys in dbattribute bucket")

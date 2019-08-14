@@ -1028,7 +1028,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 		e := RunOperation(vdo, app.executor)
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 4,
@@ -1060,7 +1060,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 		tests.Assert(t, e == nil, "expected e == nil, got:", e)
 		defer cleanupVolume(vol)
 
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1092,7 +1092,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 
 		// Check that we don't leave any pending volume
 		// and the volume count is still the same as before
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1127,7 +1127,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 
 		// Check that we don't leave any pending volume
 		// and the volume count is still the same as before
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1144,7 +1144,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
 		e = vco.Finalize()
 		tests.Assert(t, e == nil, "expected e == nil, got", e)
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1182,7 +1182,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 
 		// Check that we don't leave any pending volume
 		// and the volume count is still the same as before
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1221,7 +1221,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 
 		// Check that we don't leave any pending volume
 		// and the volume count is still the same as before
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,
@@ -1269,7 +1269,7 @@ func TestVolumeCreateLimits(t *testing.T) {
 
 		// Check that we don't leave any pending volume
 		// and the volume count is still the same as before
-		app.db.View(func(tx *bolt.Tx) error {
+		app.db.View(func(tx *wdb.Tx) error {
 			vols, err := VolumeList(tx)
 			tests.Assert(t, err == nil, "expected err == nil, got:", err)
 			tests.Assert(t, len(vols) == 5,

@@ -668,7 +668,7 @@ func (d *DeviceEntry) ToHandle() *executors.DeviceVgHandle {
 func allDevicePvUUID(db wdb.RODB) (map[string]string, int, error) {
 	pvmap := map[string]string{}
 	deviceCount := 0
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *wdb.Tx) error {
 		dl, err := DeviceList(tx)
 		if err != nil {
 			return err

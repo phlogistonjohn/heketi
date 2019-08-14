@@ -24,7 +24,7 @@ import (
 func (a *App) AppOperationsInfo() (*api.OperationsInfo, error) {
 	info := &api.OperationsInfo{}
 
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.db.View(func(tx *wdb.Tx) error {
 		ops, err := PendingOperationList(tx)
 		if err != nil {
 			return err

@@ -935,7 +935,7 @@ func TestDeviceSyncBlockedByPending(t *testing.T) {
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 
 	var deviceId string
-	app.db.View(func(tx *bolt.Tx) error {
+	app.db.View(func(tx *wdb.Tx) error {
 		ids, err := DeviceList(tx)
 		tests.Assert(t, err == nil, "expected err == nil, got:", err)
 		tests.Assert(t, len(ids) == 1)
