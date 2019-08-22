@@ -46,6 +46,7 @@ var (
 	force                        bool
 	disableAuth                  bool
 	updateDbVolName              string
+	churnCount                   int
 )
 
 var RootCmd = &cobra.Command{
@@ -341,6 +342,42 @@ var updateDbVolCmd = &cobra.Command{
 	},
 }
 
+
+var churnCmd = &cobra.Command{
+	Use:     "churn",
+	Short:   "simulate a large number of operations",
+	Long:    "simulate a large number of operations",
+	Example: "heketi offline churn --config=heketi.json --iterations=500",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(os.Stdout, "OFFLINE COMMAND: Churn\n")
+		if configfile == "" {
+			fmt.Fprintf(os.Stderr, "Configuration file is required\n")
+			os.Exit(1)
+		}
+		if churnCount == 0 {
+			fmt.Fprintf(os.Stderr, "Iterations count is required\n")
+			os.Exit(1)
+		}
+
+		// Read configuration
+		c, err := config.ReadConfig(configfile)
+		if err != nil {
+			os.Exit(1)
+		}
+
+		randSeed()
+		app := setupApp(c)
+
+		fmt.Fprintf(os.Stderr, "Starting churn now...\n")
+		err = glusterfs.ChurnOMatic(app, churnCount)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Churn Error: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	},
+}
+
 func init() {
 	RootCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
 	RootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version")
@@ -396,6 +433,11 @@ func init() {
 	updateDbVolCmd.SilenceUsage = true
 	updateDbVolCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
 	updateDbVolCmd.Flags().StringVar(&updateDbVolName, "force-volume-name", "", "Force volume name")
+
+	offlineCmd.AddCommand(churnCmd)
+	churnCmd.SilenceUsage = true
+	churnCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
+	churnCmd.Flags().IntVar(&churnCount, "iterations", 0, "Number of iterations to churn")
 }
 
 func setWithEnvVariables(options *config.Config) {
