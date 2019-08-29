@@ -369,7 +369,8 @@ var churnCmd = &cobra.Command{
 		app := setupApp(c)
 
 		fmt.Fprintf(os.Stderr, "Starting churn now...\n")
-		err = glusterfs.ChurnOMatic(app, churnCount)
+		derp := os.Getenv("EVIL")
+		err = glusterfs.ChurnOMatic(app, derp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Churn Error: %v\n", err)
 			os.Exit(1)

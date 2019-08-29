@@ -10,6 +10,8 @@
 package glusterfs
 
 import (
+	"bytes"
+	"io/ioutil"
 	"fmt"
 	"math/rand"
 
@@ -18,14 +20,88 @@ import (
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 )
 
-func ChurnOMatic(app *App, count int) error {
-	for i := 0; i < count; i++ {
-		logger.Info("Churn pass: %+v", i)
-		err := churnOnce(app, i)
+type Extract interface {
+	Reset() error
+	Key() []byte
+	BackOffset() int
+	Unmarshal([]byte) error
+	Report() error
+}
+
+func ChurnOMatic(app *App, trashFile string) error {
+	x, err := ioutil.ReadFile(trashFile)
+	if err != nil {
+		return err
+	}
+
+	volExtractor := newVolumeExtractor()
+	return exhume(x, volExtractor)
+}
+
+func exhume(x []byte, extractor Extract) error {
+	for pos := 0; pos < len(x); {
+		err := extractor.Reset()
 		if err != nil {
 			return err
 		}
+		fmt.Printf("pos=%v\n", pos)
+		x1 := x[pos:]
+		p2 := bytes.Index(x1, extractor.Key())
+		if p2 == -1 {
+			return fmt.Errorf("arf")
+		}
+		pos = pos + p2 - extractor.BackOffset()
+		fmt.Printf("FOUND pos=%v\n", pos)
+
+		var e int
+		for e = pos + 64; e < (pos + 4096); e++ {
+			x2 := x[pos:e]
+			//fmt.Printf("X2: %v, %v, %+v\n", pos, e, x2)
+			err = extractor.Unmarshal(x2)
+			if err == nil {
+				break
+			}
+		}
+		pos = e + 1
+		//fmt.Printf("SET pos=%v\n", pos)
+		if err := extractor.Report(); err != nil {
+			return err
+		}
 	}
+
+	return nil
+}
+
+type volumeExtractor struct {
+	v *VolumeEntry
+}
+
+func (ve *volumeExtractor) Key() []byte {
+	return []byte("\x0bVolumeEntry")
+}
+
+func (ve *volumeExtractor) BackOffset() int {
+	return 6
+}
+
+func (ve *volumeExtractor) Reset() error {
+	ve.v = nil
+	return nil
+}
+
+func (ve *volumeExtractor) Unmarshal(buf []byte) error {
+	ve.v = NewVolumeEntry()
+	return ve.v.Unmarshal(buf)
+}
+
+func (ve *volumeExtractor) Report() error {
+	if ve.v == nil {
+		return fmt.Errorf("No volume found")
+	}
+	if ve.v.Info.Id == "" {
+		return fmt.Errorf("Incomplete volume")
+	}
+	fmt.Printf("V: %s %s\n", ve.v.Info.Id, ve.v.Info.Name)
 	return nil
 }
 
@@ -47,6 +123,10 @@ func churnOnce(app *App, cpass int) error {
 		}
 	}
 	return nil
+}
+
+func newVolumeExtractor() *volumeExtractor {
+	return &volumeExtractor{}
 }
 
 func churnItem(app *App, cpass, n int) error {
