@@ -55,10 +55,12 @@ func BrickList(tx *bolt.Tx) ([]string, error) {
 func NewBrickEntry(size, tpsize, poolMetadataSize uint64,
 	deviceid, nodeid string, gid int64, volumeid string) *BrickEntry {
 
+/*
 	godbc.Require(size > 0)
 	godbc.Require(tpsize > 0)
 	godbc.Require(deviceid != "")
 	godbc.Require(nodeid != "")
+*/
 
 	entry := &BrickEntry{}
 	entry.gidRequested = gid
