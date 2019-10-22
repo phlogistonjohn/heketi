@@ -139,7 +139,7 @@ func (ve *volumeExtractor) BackOffset() int {
 }
 
 func (ve *volumeExtractor) Bounds() (int, int) {
-	return 64, 4066
+	return 64, 4096
 }
 
 func (ve *volumeExtractor) Reset() error {
@@ -183,7 +183,7 @@ func (ve *blockVolumeExtractor) BackOffset() int {
 }
 
 func (ve *blockVolumeExtractor) Bounds() (int, int) {
-	return 64, 4066
+	return 64, 4096
 }
 
 func (ve *blockVolumeExtractor) Reset() error {
@@ -227,7 +227,7 @@ func (ve *brickExtractor) BackOffset() int {
 }
 
 func (ve *brickExtractor) Bounds() (int, int) {
-	return 64, 4066
+	return 64, 4096
 }
 
 func (ve *brickExtractor) Reset() error {
@@ -271,7 +271,7 @@ func (ve *deviceExtractor) BackOffset() int {
 }
 
 func (ve *deviceExtractor) Bounds() (int, int) {
-	return 64, 4066
+	return 64, 4096*4
 }
 
 func (ve *deviceExtractor) Reset() error {
@@ -315,7 +315,7 @@ func (ve *nodeExtractor) BackOffset() int {
 }
 
 func (ve *nodeExtractor) Bounds() (int, int) {
-	return 64, 4066
+	return 64, 4096
 }
 
 func (ve *nodeExtractor) Reset() error {
@@ -359,7 +359,7 @@ func (ve *clusterExtractor) BackOffset() int {
 }
 
 func (ve *clusterExtractor) Bounds() (int, int) {
-	return 64, 4066*8
+	return 64, 4096*8
 }
 
 func (ve *clusterExtractor) Reset() error {
