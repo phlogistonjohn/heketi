@@ -31,6 +31,7 @@ type Extract interface {
 	Reset() error
 	Key() []byte
 	BackOffset() int
+	Bounds() (int, int)
 	Unmarshal([]byte) error
 	Report() error
 }
@@ -52,6 +53,8 @@ func ChurnOMatic(app *App, trashFile string) error {
 	dump.DbAttributes = make(map[string]DbAttributeEntry, 0)
 	dump.PendingOperations = make(map[string]PendingOperationEntry, 0)
 
+/*
+*/
 	volExtractor := newVolumeExtractor(&dump)
 	fmt.Printf("Volumes: %v\n", exhume(x, volExtractor))
 
@@ -97,18 +100,21 @@ func exhume(x []byte, extractor Extract) error {
 		fmt.Printf("FOUND pos=%v\n", pos)
 
 		var e int
-		for e = pos + 64; e < (pos + 4096); e++ {
+		smin, smax := extractor.Bounds()
+		for e = pos + smin; e < (pos + smax); e++ {
 			x2 := x[pos:e]
 			//fmt.Printf("X2: %v, %v, %+v\n", pos, e, x2)
 			err = extractor.Unmarshal(x2)
 			if err == nil {
+				fmt.Printf("found end position: %v\n", e)
 				break
 			}
 		}
 		pos = e + 1
 		//fmt.Printf("SET pos=%v\n", pos)
 		if err := extractor.Report(); err != nil {
-			return err
+			continue
+			//return err
 		}
 	}
 
@@ -130,6 +136,10 @@ func (ve *volumeExtractor) Key() []byte {
 
 func (ve *volumeExtractor) BackOffset() int {
 	return 6
+}
+
+func (ve *volumeExtractor) Bounds() (int, int) {
+	return 64, 4066
 }
 
 func (ve *volumeExtractor) Reset() error {
@@ -172,6 +182,10 @@ func (ve *blockVolumeExtractor) BackOffset() int {
 	return 7
 }
 
+func (ve *blockVolumeExtractor) Bounds() (int, int) {
+	return 64, 4066
+}
+
 func (ve *blockVolumeExtractor) Reset() error {
 	ve.v = nil
 	return nil
@@ -210,6 +224,10 @@ func (ve *brickExtractor) Key() []byte {
 
 func (ve *brickExtractor) BackOffset() int {
 	return 7
+}
+
+func (ve *brickExtractor) Bounds() (int, int) {
+	return 64, 4066
 }
 
 func (ve *brickExtractor) Reset() error {
@@ -252,6 +270,10 @@ func (ve *deviceExtractor) BackOffset() int {
 	return 7
 }
 
+func (ve *deviceExtractor) Bounds() (int, int) {
+	return 64, 4066
+}
+
 func (ve *deviceExtractor) Reset() error {
 	ve.device = nil
 	return nil
@@ -290,6 +312,10 @@ func (ve *nodeExtractor) Key() []byte {
 
 func (ve *nodeExtractor) BackOffset() int {
 	return 7
+}
+
+func (ve *nodeExtractor) Bounds() (int, int) {
+	return 64, 4066
 }
 
 func (ve *nodeExtractor) Reset() error {
@@ -332,6 +358,10 @@ func (ve *clusterExtractor) BackOffset() int {
 	return 7
 }
 
+func (ve *clusterExtractor) Bounds() (int, int) {
+	return 64, 4066*8
+}
+
 func (ve *clusterExtractor) Reset() error {
 	ve.cluster = nil
 	return nil
@@ -347,6 +377,7 @@ func (ve *clusterExtractor) Report() error {
 		return fmt.Errorf("No cluster found")
 	}
 	if ve.cluster.Info.Id == "" {
+		fmt.Printf("%+v", ve.cluster)
 		return fmt.Errorf("Incomplete cluster")
 	}
 	fmt.Printf("D: %s %s\n", ve.cluster.Info.Id)
