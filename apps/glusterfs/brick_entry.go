@@ -52,6 +52,11 @@ func BrickList(tx *bolt.Tx) ([]string, error) {
 	return list, nil
 }
 
+func NewEmptyBrickEntry() *BrickEntry {
+	return &BrickEntry{}
+}
+
+
 func NewBrickEntry(size, tpsize, poolMetadataSize uint64,
 	deviceid, nodeid string, gid int64, volumeid string) *BrickEntry {
 

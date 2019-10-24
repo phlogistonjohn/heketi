@@ -236,7 +236,7 @@ func (ve *brickExtractor) Reset() error {
 }
 
 func (ve *brickExtractor) Unmarshal(buf []byte) error {
-	ve.b = NewBrickEntry(0, 0, 0, "", "", 0, "")
+	ve.b = NewEmptyBrickEntry()
 	return ve.b.Unmarshal(buf)
 }
 
