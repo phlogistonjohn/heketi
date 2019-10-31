@@ -9,7 +9,7 @@
 
 /*
 YEAH, this is silly:
-EVIL=damaged.db  ./heketi offline churn  --config heketi.json  --iterations 1
+./heketi offline scrape-hack --config heketi.json --scrape damaged.db
 */
 
 package glusterfs

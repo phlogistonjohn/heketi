@@ -348,7 +348,7 @@ var scrapeHackCmd = &cobra.Command{
 	Long:    "omg",
 	Example: "heketi offline scrape-hack --config=heketi.json --scrape=bad.db",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(os.Stdout, "OFFLINE COMMAND: Churn\n")
+		fmt.Fprintf(os.Stdout, "OFFLINE COMMAND: scrape-hack\n")
 		if configfile == "" {
 			fmt.Fprintf(os.Stderr, "Configuration file is required\n")
 			os.Exit(1)
@@ -369,7 +369,7 @@ var scrapeHackCmd = &cobra.Command{
 
 		err = glusterfs.ScrapeDB(app, scrapeFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Churn Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Scrape Error: %v\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
