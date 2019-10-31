@@ -31,7 +31,7 @@ type Extract interface {
 	Report() error
 }
 
-func ChurnOMatic(app *App, trashFile string) error {
+func ScrapeDB(app *App, trashFile string) error {
 	logger.Info("Opening: %s", trashFile)
 	x, err := ioutil.ReadFile(trashFile)
 	if err != nil {
