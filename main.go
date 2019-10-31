@@ -46,7 +46,7 @@ var (
 	force                        bool
 	disableAuth                  bool
 	updateDbVolName              string
-	churnCount                   int
+	scrapeFile                   string
 )
 
 var RootCmd = &cobra.Command{
@@ -342,20 +342,19 @@ var updateDbVolCmd = &cobra.Command{
 	},
 }
 
-
-var churnCmd = &cobra.Command{
-	Use:     "churn",
-	Short:   "simulate a large number of operations",
-	Long:    "simulate a large number of operations",
-	Example: "heketi offline churn --config=heketi.json --iterations=500",
+var scrapeHackCmd = &cobra.Command{
+	Use:     "scrape-hack",
+	Short:   "omg",
+	Long:    "omg",
+	Example: "heketi offline scrape-hack --config=heketi.json --scrape=bad.db",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stdout, "OFFLINE COMMAND: Churn\n")
 		if configfile == "" {
 			fmt.Fprintf(os.Stderr, "Configuration file is required\n")
 			os.Exit(1)
 		}
-		if churnCount == 0 {
-			fmt.Fprintf(os.Stderr, "Iterations count is required\n")
+		if scrapeFile == "" {
+			fmt.Fprintf(os.Stderr, "Scrape file is required\n")
 			os.Exit(1)
 		}
 
@@ -368,9 +367,7 @@ var churnCmd = &cobra.Command{
 		randSeed()
 		app := setupApp(c)
 
-		fmt.Fprintf(os.Stderr, "Starting churn now...\n")
-		derp := os.Getenv("EVIL")
-		err = glusterfs.ChurnOMatic(app, derp)
+		err = glusterfs.ScrapeDB(app, scrapeFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Churn Error: %v\n", err)
 			os.Exit(1)
@@ -435,10 +432,10 @@ func init() {
 	updateDbVolCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
 	updateDbVolCmd.Flags().StringVar(&updateDbVolName, "force-volume-name", "", "Force volume name")
 
-	offlineCmd.AddCommand(churnCmd)
-	churnCmd.SilenceUsage = true
-	churnCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
-	churnCmd.Flags().IntVar(&churnCount, "iterations", 0, "Number of iterations to churn")
+	offlineCmd.AddCommand(scrapeHackCmd)
+	scrapeHackCmd.SilenceUsage = true
+	scrapeHackCmd.Flags().StringVar(&configfile, "config", "", "Configuration file")
+	scrapeHackCmd.Flags().StringVar(&scrapeFile, "scrape", "", "File to scrape")
 }
 
 func setWithEnvVariables(options *config.Config) {
