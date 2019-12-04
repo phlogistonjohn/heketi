@@ -46,6 +46,14 @@ def parse_swap_file(fname):
     return swaps
 
 
+class TpInfo(object):
+    def __init__(self, brick_id, tp_name, lv_size):
+        self.brick_id = brick_id
+        self.tp_name = tp_name
+        self._raw_lv_size = lv_size
+        self.lv_size = int(lv_size.split('.')[0])
+
+
 def parse_tpmap(*lv_json):
     tpmap = {}
     for j in lv_json:
@@ -57,7 +65,7 @@ def parse_tpmap(*lv_json):
                     p = lv['pool_lv']
                     if l.startswith('brick_') and p:
                         b = l.split('_', 1)[1]
-                        tpmap[b] = p
+                        tpmap[b] = TpInfo(b, p, lv['lv_size'])
     return tpmap
 
 
@@ -82,8 +90,12 @@ def swap_brick(heketi, tpmap, old_device, old_brick, new_device, new_brick):
     bnew['Info']['node'] = heketi['deviceentries'][new_device]["NodeId"]
     if bnew['LvmThinPool']:
         if new_brick not in tpmap:
-            raise CliError("brick not in thin-pool map, can not guess at thin pool")
-        bnew['LvmThinPool'] = tpmap[new_brick]
+            raise CliError(
+                "brick {} not in thin-pool map, can not guess at thin pool".format(new_brick))
+        bnew['LvmThinPool'] = tpmap[new_brick].tp_name
+    if new_brick in tpmap:
+        if bnew['TpSize'] != tpmap[new_brick].lv_size:
+            raise CliError('brick size does not match size in thin-pool map')
 
     # stitch in new brick
     heketi['brickentries'][new_brick] = bnew
