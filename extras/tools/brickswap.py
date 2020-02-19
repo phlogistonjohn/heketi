@@ -15,6 +15,8 @@ Create a new updated heketi json where bricks have been swapped.
 EXAMPLE = """
 """
 
+CHECK_THIN_POOLS = True
+
 
 LF = '%(asctime)s: %(levelname)s: %(message)s'
 log = logging.getLogger('scrub')
@@ -88,7 +90,7 @@ def swap_brick(heketi, tpmap, old_device, old_brick, new_device, new_brick):
         '/var/lib/heketi/mounts/vg_{}/brick_{}/brick'.format(new_device, new_brick))
     bnew['Info']['device'] = new_device
     bnew['Info']['node'] = heketi['deviceentries'][new_device]["NodeId"]
-    if bnew['LvmThinPool']:
+    if bnew['LvmThinPool'] and CHECK_THIN_POOLS:
         if new_brick not in tpmap:
             raise CliError(
                 "brick {} not in thin-pool map, can not guess at thin pool".format(new_brick))
