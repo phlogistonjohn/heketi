@@ -157,6 +157,10 @@ def parse_gvinfo(gvi):
             if l.startswith('Brick') and l != "Bricks:":
                 if volume is None:
                     raise ValueError("Got Brick before volume: %s" % l)
+                if l.endswith(')'):
+                    # account for "(arbiter)" tags and any other
+                    # parens tags g-v-info might produce
+                    l = l.rsplit(' ', 1)[0]
                 vols[volume].append(l.split(":", 1)[-1].strip())
     return vols
 
