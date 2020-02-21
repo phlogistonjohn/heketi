@@ -81,6 +81,11 @@ class Brick(object):
             self.size = vs * (1024 * 1024)
             self.tp_size = self.size
             self.pmd_size = PMD_TABLE[vs]
+        if 'lv_size' in kwargs:
+            lv_size = clean_lv_size(kwargs['lv_size'])
+            self.size = lv_size
+            self.tp_size = lv_size
+            self.pmd_size = calc_pmd_size(lv_size, check=kwargs['vol_size'])
         if 'tp_name' in kwargs:
             self.tp_name = kwargs['tp_name']
             if self.brick_id not in self.tp_name:
@@ -88,6 +93,13 @@ class Brick(object):
 
     def __repr__(self):
         return 'Brick'+repr(vars(self))
+
+
+def clean_lv_size(txt):
+    if not txt.endswith('.00k'):
+        raise ValueError('unexpected size: {}'.format(txt))
+    s = txt.split('.')[0]
+    return int(s)
 
 
 def brick_path_id(bp):
@@ -158,6 +170,30 @@ PMD_TABLE = {
     80: 421888,
     100: 524288,
 }
+
+EXTENT_SIZE = 4096
+MAX_PMD_SIZE = 16 * (1024 * 1024)
+
+
+def calc_pmd_size(tpsize, check=None):
+    alignment = tpsize % EXTENT_SIZE
+    if alignment != 0:
+        raise ValueError("alignment!")
+
+    metadataSize = int(float(tpsize) * 0.005)
+    if metadataSize > MAX_PMD_SIZE:
+        metadataSize = MAX_PMD_SIZE
+
+    alignment = metadataSize % EXTENT_SIZE
+    if alignment != 0:
+        metadataSize += d.ExtentSize - alignment
+
+    if check and PMD_TABLE[check]:
+        log.info("checking PoolMetadataSize against table")
+        if PMD_TABLE[check] != metadataSize:
+            log.warning('PoolMetadataSize not as exptected, got %s, expected %s',
+                metadataSize, PMD_TABLE[check])
+    return metadataSize
 
 
 VOL_STUB = {
@@ -315,6 +351,7 @@ def restore_volumes(hdata, gvinfo, pvdata, lvdata, vols):
 def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap, increase_usage=True):
 
     lvmap = {}
+    lvs = {}
     diffcount = 0
     for lv in lvinfo:
         lv_name = lv['lv_name']
@@ -323,6 +360,7 @@ def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap, increase_usage=Tru
             lvmap[lv_name] = pool_lv
             if lv_name.split('_')[1] != pool_lv.split('_')[1]:
                 diffcount += 1
+            lvs[lv_name] = lv
     log.info('differing lv brick id / pool id count = %s', diffcount)
 
     for vid in hdata['volumeentries'].keys():
@@ -367,9 +405,11 @@ def restore_bricks(hdata, gvinfo, pvdata, lvinfo, brick_swap, increase_usage=Tru
                 b = brick_from_brick(hdata, brick_swap[brick_id], bpath)
             else:
                 b = brick_from_path(hdata, bpath)
+            brick_key = 'brick_{}'.format(b.brick_id)
             b.update(
                 vol_id=vid,
                 vol_size=vsize,
+                lv_size=lvs.get(brick_key, {}).get('lv_size', ''),
                 tp_name=lvmap.get('brick_{}'.format(b.brick_id), ''))
             hdata['brickentries'][b.brick_id] = b.expand()
             if b.brick_id not in hdata['volumeentries'][vid]['Bricks']:
