@@ -557,3 +557,88 @@ func blockVolumesFromOp(db wdb.RODB,
 	})
 	return bvs, err
 }
+
+// XyzOperation does something useful.
+type XyzOperation struct {
+	OperationManager   // indicates the operation is managed in the db
+	noRetriesOperation // the operation is tried only once by heketi itself
+
+	// operation configuration. will become part of pending operation
+	blockVolumeId string
+
+	// purely internal fields for cross-function state.
+	// typically populated by an Exec or Clean call and used by Finalize or
+	// CleanDone.
+	currentSize uint64
+}
+
+// NewXyzOperation creates a new as-yet-unsaved operation.
+func NewXyzOperation(id string, db wdb.DB) *XyzOperation {
+	return nil
+}
+
+// loadXyzOperation loads an operation given a pendingoperationentry
+// pulled from the db. Only implement this if the operation is loadable.
+// This function must be added to LoadOperation to make this automatically
+// loadable and cleanable.
+func loadXyzOperation(db wdb.DB, p *PendingOperationEntry) (*XyzOperation, error) {
+	return nil, nil
+}
+
+// Label describes the operation.
+func (xo *XyzOperation) Label() string {
+	return "Describe what the operation does"
+}
+
+// ResourceUrl returns a string to link an operation to its result
+// in the API.
+func (xo *XyzOperation) ResourceUrl() string {
+	return ""
+}
+
+// Build makes changes to the db to track what changes need to be done to
+// implement the operation. Typically, this means adding at least one pending
+// operation entry to the db. It also is expected to subtract any needed space
+// from "container" objects such that space is effectively reserved until the
+// operation succeeds or is added back by Rollback/CleanDone.
+// It should perform exactly _one_ db transaction.
+func (xo *XyzOperation) Build() error {
+	return nil
+}
+
+// Exec runs commands on the storage subsystems making the changes needed
+// by the operation.
+func (xo *XyzOperation) Exec(executor executors.Executor) error {
+	return nil
+}
+
+// Finalize updates the heketi db making permanent any changes that were
+// previously pending in the db.
+// It should perform exactly _one_ db transaction.
+func (xo *XyzOperation) Finalize() error {
+	return nil
+}
+
+// Rollback is executed if Exec returns an error. It is expected to
+// return the system to the state prior to the operation when possible.
+// If the operation is cleanable Rollback is implemented via the
+// the clean functions and needs no custom code.
+func (xo *XyzOperation) Rollback(executor executors.Executor) error {
+	return rollbackViaClean(bvc, executor)
+}
+
+// Clean removes any pending items from the system. Clean is expected to
+// be idempotent. Think of Clean as "undoing" anything a failed Exec
+// call may have done. It may be called as many times as needed until
+// it returns no error indicating the subsystems are clean.
+func (xo *XyzOperation) Clean(executor executors.Executor) error {
+	return nil
+}
+
+// CleanDone finishes cleaning the operation by making any needed db updates
+// to make heketi db state consistent with that of a successful Clean
+// call. CleanDone is not called if Clean returns an error.
+// It should perform exactly _one_ db transaction.
+func (xo *XyzOperation) CleanDone() error {
+	return nil
+}

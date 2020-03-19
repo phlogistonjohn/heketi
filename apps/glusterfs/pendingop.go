@@ -37,6 +37,7 @@ const (
 	OperationRemoveDevice
 	OperationCloneVolume
 	OperationBrickEvict
+	OperationXyz // new pending operation type
 )
 
 // PendingChangeType identifies what kind of lower-level new item or change
@@ -56,6 +57,7 @@ const (
 	OpCloneVolume
 	OpSnapshotVolume
 	OpAddVolumeClone
+	OpFooBar // new pending change type. name it after the thing you're doing not the operation as many operations can share change types
 )
 
 // PendingOperationAction tracks individual changes to entries within the
