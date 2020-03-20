@@ -624,7 +624,7 @@ func (xo *XyzOperation) Finalize() error {
 // If the operation is cleanable Rollback is implemented via the
 // the clean functions and needs no custom code.
 func (xo *XyzOperation) Rollback(executor executors.Executor) error {
-	return rollbackViaClean(bvc, executor)
+	return rollbackViaClean(xo, executor)
 }
 
 // Clean removes any pending items from the system. Clean is expected to
