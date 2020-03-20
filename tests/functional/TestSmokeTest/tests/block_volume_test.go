@@ -256,3 +256,18 @@ func TestBlockVolumeDeleteFailureConditions(t *testing.T) {
 	err = heketi.BlockVolumeDelete(bvol.Id)
 	tests.Assert(t, err == nil, "expected err == nil, got:", err)
 }
+
+func TestXyzOperation(t *testing.T) {
+
+	setupCluster(t, 3, 4)
+	defer teardownCluster(t)
+	defer teardownBlock(t)
+
+	// add simpler "happy path" test(s) here
+	// heketi is managed for you by the test "framework"
+	// just issue requests to the API and verify
+	// heketi has responded correctly
+	// you can also double check some items by running commands
+	// on the node, but that should only be done if strictly
+	// necessary.
+}
