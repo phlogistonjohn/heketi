@@ -281,8 +281,8 @@ def parse_gvinfo(gvi):
 
 def parse_lv_json(*jfiles):
     lv = []
-    log.info("Reading lv json: %r", jfiles)
     for jfile in jfiles:
+        log.info("Reading lv json: %r", jfile)
         with open(jfile) as fh:
             j = json.load(fh)
         lv_inner = j["report"][0]["lv"]
