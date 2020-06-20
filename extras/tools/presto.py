@@ -448,9 +448,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--gluster-info', '-g',
+        required=True,
         help='Path to a file containing gluster volume info')
     parser.add_argument(
         '--heketi-json', '-j',
+        required=True,
         help='Path to a file containing Heketi db json export')
     parser.add_argument(
         '--pv-yaml', '-y',
