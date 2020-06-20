@@ -186,7 +186,7 @@ def calc_pmd_size(tpsize, check=None):
 
     alignment = metadataSize % EXTENT_SIZE
     if alignment != 0:
-        metadataSize += d.ExtentSize - alignment
+        metadataSize += EXTENT_SIZE - alignment
 
     if check and PMD_TABLE[check]:
         log.info("checking PoolMetadataSize against table")
