@@ -306,19 +306,7 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		case api.EntryStateOnline:
 			return nil
 		case api.EntryStateOffline:
-			err := db.Update(func(tx *bolt.Tx) error {
-				// Save state
-				n.State = s.State
-				// Save new state
-				err := n.Save(tx)
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
+			return n.modifyState(db, s)
 		case api.EntryStateFailed:
 			return fmt.Errorf("Node must be offline before remove operation is performed, node:%v", n.Info.Id)
 		default:
@@ -331,53 +319,67 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		case api.EntryStateOffline:
 			return nil
 		case api.EntryStateOnline:
-			err := db.Update(func(tx *bolt.Tx) error {
-				n.State = s.State
-				err := n.Save(tx)
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
+			return n.modifyState(db, s)
 		case api.EntryStateFailed:
-			for _, id := range n.Devices {
-				var d *DeviceEntry
-				err := db.View(func(tx *bolt.Tx) error {
-					var err error
-					d, err = NewDeviceEntryFromId(tx, id)
-					if err != nil {
-						return err
-					}
-					return nil
-				})
-				err = d.Remove(db, e, s)
-				if err != nil {
-					if err == ErrNoReplacement {
-						return logger.LogError("Unable to remove node [%v] as no device was found to replace device [%v]", n.Info.Id, d.Id())
-					}
-					return err
-				}
-			}
-
-			// Make the state change to failed
-			err := db.Update(func(tx *bolt.Tx) error {
-				n.State = s.State
-				err := n.Save(tx)
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-
+			return n.setNodeFailed(db, e, s)
 		default:
 			return fmt.Errorf("Unknown state type: %v", s)
 		}
+	}
+	return nil
+}
+
+func (n *NodeEntry) modifyState(db wdb.DB, s api.StateRequest) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		n.State = s.State
+		err := n.Save(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *NodeEntry) setNodeFailed(db wdb.DB, e executors.Executor,
+	s api.StateRequest) error {
+
+	if s.State != api.EntryStateFailed {
+		return fmt.Errorf("invalid state: %v", s.State)
+	}
+	for _, id := range n.Devices {
+		var d *DeviceEntry
+		err := db.View(func(tx *bolt.Tx) error {
+			var err error
+			d, err = NewDeviceEntryFromId(tx, id)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		err = d.Remove(db, e, s)
+		if err != nil {
+			if err == ErrNoReplacement {
+				return logger.LogError("Unable to remove node [%v] as no device was found to replace device [%v]", n.Info.Id, d.Id())
+			}
+			return err
+		}
+	}
+
+	// Make the state change to failed
+	err := db.Update(func(tx *bolt.Tx) error {
+		n.State = s.State
+		err := n.Save(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
