@@ -191,8 +191,10 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 		switch s {
 		case api.EntryStateFailed:
 			return nil
-		case api.EntryStateOnline, api.EntryStateOffline, api.EntryStatePermanentlyOffline:
+		case api.EntryStateOnline, api.EntryStatePermanentlyOffline:
 			return fmt.Errorf("Cannot move a failed/removed device to %s state", s)
+		case api.EntryStateOffline:
+			return nil
 		default:
 			return fmt.Errorf("Unknown state type: %v", s)
 		}
