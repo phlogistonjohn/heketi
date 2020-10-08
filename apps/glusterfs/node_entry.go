@@ -292,10 +292,8 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		switch s.State {
 		case api.EntryStateFailed:
 			return nil
-		case api.EntryStateOnline:
-			return fmt.Errorf("Cannot move a failed/removed node to online state")
-		case api.EntryStateOffline:
-			return fmt.Errorf("Cannot move a failed/removed node to offline state")
+		case api.EntryStateOnline, api.EntryStateOffline, api.EntryStatePermanentlyOffline:
+			return fmt.Errorf("Cannot move a failed/removed node to %s state", s.State)
 		default:
 			return fmt.Errorf("Unknown state type: %v", s)
 		}
@@ -307,6 +305,8 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 			return nil
 		case api.EntryStateOffline:
 			return n.modifyState(db, s)
+		case api.EntryStatePermanentlyOffline:
+			return fmt.Errorf("Node must be set offline before marking it permanently offline")
 		case api.EntryStateFailed:
 			return fmt.Errorf("Node must be offline before remove operation is performed, node:%v", n.Info.Id)
 		default:
@@ -318,8 +318,22 @@ func (n *NodeEntry) SetState(db wdb.DB, e executors.Executor,
 		switch s.State {
 		case api.EntryStateOffline:
 			return nil
+		case api.EntryStatePermanentlyOffline:
+			return n.modifyState(db, s)
 		case api.EntryStateOnline:
 			return n.modifyState(db, s)
+		case api.EntryStateFailed:
+			return n.setNodeFailed(db, e, s)
+		default:
+			return fmt.Errorf("Unknown state type: %v", s)
+		}
+
+	case api.EntryStatePermanentlyOffline:
+		switch s.State {
+		case api.EntryStateOffline, api.EntryStateOnline:
+			return fmt.Errorf("Can not move a permanently offline node to %s state", s)
+		case api.EntryStatePermanentlyOffline:
+			return nil
 		case api.EntryStateFailed:
 			return n.setNodeFailed(db, e, s)
 		default:

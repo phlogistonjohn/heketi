@@ -58,11 +58,14 @@ const (
 	EntryStateOnline  EntryState = "online"
 	EntryStateOffline EntryState = "offline"
 	EntryStateFailed  EntryState = "failed"
+	// EntryStatePermanentlyOffline works just like offline, but a permanently
+	// offline node may never be brought online again.
+	EntryStatePermanentlyOffline EntryState = "permanently-offline"
 )
 
 func ValidateEntryState(value interface{}) error {
 	s, _ := value.(EntryState)
-	err := validation.Validate(s, validation.Required, validation.In(EntryStateOnline, EntryStateOffline, EntryStateFailed))
+	err := validation.Validate(s, validation.Required, validation.In(EntryStateOnline, EntryStateOffline, EntryStateFailed, EntryStatePermanentlyOffline))
 	if err != nil {
 		return fmt.Errorf("%v is not valid state", s)
 	}

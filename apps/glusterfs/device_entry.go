@@ -166,7 +166,7 @@ func (d *DeviceEntry) SetState(db wdb.DB,
 	}
 
 	switch s.State {
-	case api.EntryStateOffline, api.EntryStateOnline:
+	case api.EntryStateOffline, api.EntryStateOnline, api.EntryStatePermanentlyOffline:
 		// simply update the state and move on
 		if err := d.modifyState(db, s.State); err != nil {
 			return err
@@ -191,10 +191,8 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 		switch s {
 		case api.EntryStateFailed:
 			return nil
-		case api.EntryStateOnline:
-			return fmt.Errorf("Cannot move a failed/removed device to online state")
-		case api.EntryStateOffline:
-			return nil
+		case api.EntryStateOnline, api.EntryStateOffline, api.EntryStatePermanentlyOffline:
+			return fmt.Errorf("Cannot move a failed/removed device to %s state", s)
 		default:
 			return fmt.Errorf("Unknown state type: %v", s)
 		}
@@ -206,6 +204,8 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 			return nil
 		case api.EntryStateOffline:
 			return nil
+		case api.EntryStatePermanentlyOffline:
+			return fmt.Errorf("Device must be set offline before marking it permanently offline")
 		case api.EntryStateFailed:
 			return fmt.Errorf("Device must be offline before remove operation is performed, device:%v", d.Id())
 		default:
@@ -217,6 +217,8 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 		switch s {
 		case api.EntryStateOffline:
 			return nil
+		case api.EntryStatePermanentlyOffline:
+			return nil
 		case api.EntryStateOnline:
 			return nil
 		case api.EntryStateFailed:
@@ -224,6 +226,17 @@ func (d *DeviceEntry) stateCheck(s api.EntryState) error {
 		default:
 			return fmt.Errorf("Unknown state type: %v", s)
 		}
+
+	case api.EntryStatePermanentlyOffline:
+		switch s {
+		case api.EntryStateOnline, api.EntryStateOffline:
+			return fmt.Errorf("Can not move a permanently offline device to %s state", s)
+		case api.EntryStatePermanentlyOffline, api.EntryStateFailed:
+			return nil
+		default:
+			return fmt.Errorf("Unknown state type: %v", s)
+		}
+
 	}
 
 	return nil
