@@ -590,7 +590,7 @@ func (beo *BrickEvictOperation) execReplaceBrick(
 		return err
 	}
 
-	beo.reclaimed, err = tryDestroyBrickMap(old.bhmap(), executor)
+	beo.reclaimed, err = tryDestroyBrickMap(old.bhmap(), executor, old.node.State)
 	return err
 }
 
@@ -674,7 +674,10 @@ func (beo *BrickEvictOperation) Clean(executor executors.Executor) error {
 		return err
 	}
 
-	var newBHMap brickHostMap
+	var (
+		newBHMap     brickHostMap
+		newNodeState api.EntryState
+	)
 	err = beo.db.View(func(tx *bolt.Tx) error {
 		txdb := wdb.WrapTx(tx)
 		bmap, err := old.volume.brickNameMap(txdb)
@@ -693,6 +696,7 @@ func (beo *BrickEvictOperation) Clean(executor executors.Executor) error {
 		newBHMap = brickHostMap{
 			newBrick: newBrickNodeEntry.ManageHostName(),
 		}
+		newNodeState = newBrickNodeEntry.State
 		newBrickHostPath, err := brickHostPath(txdb, newBrick)
 		if err != nil {
 			return err
@@ -722,13 +726,13 @@ func (beo *BrickEvictOperation) Clean(executor executors.Executor) error {
 	switch beo.replaceResult {
 	case replaceComplete:
 		logger.Info("Destroying old brick contents")
-		beo.reclaimed, err = tryDestroyBrickMap(old.bhmap(), executor)
+		beo.reclaimed, err = tryDestroyBrickMap(old.bhmap(), executor, old.node.State)
 		if err != nil {
 			return logger.LogError("Error destroying old brick: %v", err)
 		}
 	case replaceIncomplete:
 		logger.Info("Destroying unused new brick contents")
-		beo.reclaimed, err = tryDestroyBrickMap(newBHMap, executor)
+		beo.reclaimed, err = tryDestroyBrickMap(newBHMap, executor, newNodeState)
 		if err != nil {
 			return logger.LogError("Error destroying new brick: %v", err)
 		}
@@ -1017,27 +1021,28 @@ func getWorkingNode(n *NodeEntry, db wdb.RODB, executor executors.Executor) (str
 	return node, err
 }
 
-func tryDestroyBrickMap(bhmap brickHostMap, executor executors.Executor) (ReclaimMap, error) {
+func tryDestroyBrickMap(bhmap brickHostMap, executor executors.Executor, nodeState api.EntryState) (ReclaimMap, error) {
 	reclaimed, err := bhmap.destroy(executor)
 	if err == nil {
 		return reclaimed, nil
 	}
+	if nodeState != api.EntryStatePermanentlyOffline {
+		return reclaimed, err
+	}
 
-	// If the destroy failed because the node is not running (ideally,
-	// permanently down) we want to continue with the operation . But if the
-	// node works we failed for a "real" reason we don't want to blindly ignore
-	// errors. So we do a probe to see if the host is responsive. If the
-	// destroy has failed we will use the node's responsiveness to decide if
-	// this should be treated as a failure or not.  It is bit hacky but should
-	// work around the lack of proper error handling in most common cases.
+	// If the destroy failed because the node is not running (it is permanently
+	// down) we want to continue with the operation. But if the node is
+	// actually still running we may have failed for an interesting reason so
+	// we don't want to blindly ignore errors. We log the state of the node and
+	// the original error an then return without failing the "destroy".
 	for b, node := range bhmap {
 		destroyErr := logger.LogError("Error destroying brick [%v]: %v", b, err)
 		err := executor.GlusterdCheck(node)
 		if err == nil {
-			logger.Warning("node [%v] responds to probe: failing operation", node)
-			return reclaimed, destroyErr
+			logger.Warning("node [%v] responds to probe: ignoring: %v", node, destroyErr)
+		} else {
+			logger.Warning("node [%v] does not respond to probe: ignoring: %v", node, destroyErr)
 		}
-		logger.Warning("node [%v] does not respond to probe: ignoring error destroying bricks", node)
 	}
 	return reclaimed, nil
 }
